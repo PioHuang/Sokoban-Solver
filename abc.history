@@ -1,0 +1,31 @@
+sokoban 100 maps/map5_mod.txt 1
+sokoban 34 maps/map1.txt 
+quiy
+        sat_solver_delete(pSat);
+sokoban 34 maps/map1.txt 2
+sokoban 100 maps/map4.txt 2
+sokoban 34 maps/map1MA.txt 1
+sokoban 34 maps/map1MA.txt 2
+sokoban 34 maps/map1.txt 1
+sokoban maps/map1MA.txt 1
+sokoban maps/map1MA.txt 2
+sokoban maps/map6_.txt 1
+sokoban maps/map6_.txt 2
+sokoban maps/map7.txt 1
+sokoban maps/map5_mod2.txt 1
+sokoban maps/map5_mod2.txt 2
+sokoban maps/map1.txt 1
+sokoban maps/map1.txt 2
+sokoban maps/map7.t 1
+sokoban maps/map10.txt 2
+sokoban maps/map10.txt 1
+sokoban maps/map11.txt 1
+sokoban maps/map11.txt 2
+sokoban maps/map12.txt 2
+sokoban maps/map12.txt 1
+sokoban maps/map13.txt 1
+sokoban maps/map13.txt 2
+sokoban maps/map1.txt 2
+sokoban maps/map1MA.txt 1
+source -s abc.rc
+sokoban maps/map1.txt 1
