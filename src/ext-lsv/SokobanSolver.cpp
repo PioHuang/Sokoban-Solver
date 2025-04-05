@@ -17,6 +17,7 @@ using namespace std;
 #include "algorithm"
 #include "sat/cnf/cnf.h"
 #include "stdint.h"
+
 void SokobanSolver::CnfWriter(sat_solver *pSat)
 {
     // Ensure the SAT solver is aware of the maximum variable index
@@ -110,7 +111,21 @@ SokobanSolver::SokobanSolver()
 };
 void SokobanSolver::loadMap(const string &filename)
 {
+    // define input format
+    const char playerSymbol = '@';
+    const char wallSymbol = '#';
+    const char boxSymbol = '$';
+    const char targetSymbol = '.';
+    const char walkableSymbol = ' ';
+    const char box_on_targetSymbol = '*';
+    const char player_on_targetSymbol = '+';
+
     ifstream inFile(filename);
+    if (!inFile.is_open())
+    {
+        cerr << "Error: Unable to open file " << filename << endl;
+        return;
+    }
     string line;
     int row = 0;
     int column = 0;
@@ -121,25 +136,34 @@ void SokobanSolver::loadMap(const string &filename)
             char c = line[col];
             switch (c)
             {
-            case 'P':
+            case playerSymbol:
                 mapInfo["Players"].push_back(make_pair(row, col)); // player index in map info
                 break;
-            case 'W':
+            case wallSymbol:
                 mapInfo["Walls"].push_back(make_pair(row, col));
                 break;
-            case 'B':
+            case boxSymbol:
                 mapInfo["Boxes"].push_back(make_pair(row, col)); // box index in map info
                 break;
-            case 'T':
+            case targetSymbol:
+                mapInfo["Targets"].push_back(make_pair(row, col));
+                break;
+            case box_on_targetSymbol:
+                mapInfo["Boxes"].push_back(make_pair(row, col)); // box index in map info
+                mapInfo["Targets"].push_back(make_pair(row, col));
+                break;
+            case player_on_targetSymbol:
+                mapInfo["Players"].push_back(make_pair(row, col)); // player index in map info
                 mapInfo["Targets"].push_back(make_pair(row, col));
                 break;
             default:
                 break;
             }
-            if (c != 'W')
+            if (c != wallSymbol)
                 mapInfo["Walkable"].push_back(make_pair(row, col));
-            column = line.size();
+            // column = line.size();
         }
+        column = max(column, (int)line.size());
         row++;
     }
     this->mapSize = make_pair(row, column);
@@ -148,6 +172,7 @@ void SokobanSolver::loadMap(const string &filename)
     // cout << "Map Dimension: " << mapSize.first << ", " << mapSize.second << endl;
     // cout << "PlayerNum: " << playerNum << endl;
     // cout << "BoxNum: " << boxNum << endl;
+    findDeadLockBoxPos();
     cout << "Time steps: " << stepLimit << endl;
 }
 void SokobanSolver::setStepLimit(int limit)
@@ -223,16 +248,16 @@ void SokobanSolver::PlayerMovementConstraints()
                 Clause *clause = new Clause();
                 clause->AddLit(~(AddPlayerLiteral(row, col, player, t)));
                 clause->AddLit(AddPlayerLiteral(row, col, player, t + 1));
-                if (row > 0 && mapInfo["Walls"].end() == find(mapInfo["Walls"].begin(), mapInfo["Walls"].end(), make_pair(row - 1, col))) // row-1 >= 0
+                if (row > 0 && notWall(row - 1, col)) // row-1 >= 0
                     clause->AddLit(AddPlayerLiteral(row - 1, col, player, t + 1));
                 // move down
-                if (row < mapSize.first - 1 && mapInfo["Walls"].end() == find(mapInfo["Walls"].begin(), mapInfo["Walls"].end(), make_pair(row + 1, col)))
+                if (row < mapSize.first - 1 && notWall(row + 1, col))
                     clause->AddLit(AddPlayerLiteral(row + 1, col, player, t + 1));
                 // move left
-                if (col > 0 && mapInfo["Walls"].end() == find(mapInfo["Walls"].begin(), mapInfo["Walls"].end(), make_pair(row, col - 1)))
+                if (col > 0 && notWall(row, col - 1))
                     clause->AddLit(AddPlayerLiteral(row, col - 1, player, t + 1));
                 // move right
-                if (col < mapSize.second - 1 && mapInfo["Walls"].end() == find(mapInfo["Walls"].begin(), mapInfo["Walls"].end(), make_pair(row, col + 1)))
+                if (col < mapSize.second - 1 && notWall(row, col + 1))
                     clause->AddLit(AddPlayerLiteral(row, col + 1, player, t + 1));
                 AddClause(clause);
             }
@@ -249,13 +274,13 @@ void SokobanSolver::PlayerMovementConstraints()
                 Clause *clause = new Clause();
                 clause->AddLit(~(AddPlayerLiteral(row, col, player, t)));
                 clause->AddLit(AddPlayerLiteral(row, col, player, t - 1));
-                if (row > 0 && mapInfo["Walls"].end() == find(mapInfo["Walls"].begin(), mapInfo["Walls"].end(), make_pair(row - 1, col)))
+                if (row > 0 && notWall(row - 1, col))
                     clause->AddLit(AddPlayerLiteral(row - 1, col, player, t - 1));
-                if (row < mapSize.first - 1 && mapInfo["Walls"].end() == find(mapInfo["Walls"].begin(), mapInfo["Walls"].end(), make_pair(row + 1, col)))
+                if (row < mapSize.first - 1 && notWall(row + 1, col))
                     clause->AddLit(AddPlayerLiteral(row + 1, col, player, t - 1));
-                if (col > 0 && mapInfo["Walls"].end() == find(mapInfo["Walls"].begin(), mapInfo["Walls"].end(), make_pair(row, col - 1)))
+                if (col > 0 && notWall(row, col - 1))
                     clause->AddLit(AddPlayerLiteral(row, col - 1, player, t - 1));
-                if (col < mapSize.second - 1 && mapInfo["Walls"].end() == find(mapInfo["Walls"].begin(), mapInfo["Walls"].end(), make_pair(row, col + 1)))
+                if (col < mapSize.second - 1 && notWall(row, col + 1))
                     clause->AddLit(AddPlayerLiteral(row, col + 1, player, t - 1));
                 AddClause(clause);
             }
@@ -272,6 +297,8 @@ void SokobanSolver::BoxPushMovementConstraints()
         {
             int row = walkable_coord.first;
             int col = walkable_coord.second;
+            if (isDeadLockBoxPos(row, col))
+                continue;
             for (int t = 1; t <= stepLimit; t++) // all time steps except first state t = 0
             {
                 // initialize the sets to be taken cartesian products, that is, get all the variables appeared in the constraint
@@ -280,23 +307,23 @@ void SokobanSolver::BoxPushMovementConstraints()
                 for (int player = 0; player < playerNum; player++)
                 {
                     // Ensure there are no obstacles in the push path
-                    if (row - 2 >= 0 && mapInfo["Walls"].end() == find(mapInfo["Walls"].begin(), mapInfo["Walls"].end(), make_pair(row - 1, col)) &&
-                        mapInfo["Walls"].end() == find(mapInfo["Walls"].begin(), mapInfo["Walls"].end(), make_pair(row - 2, col)))
+                    // push up
+                    if (row - 2 >= 0 && notWall(row - 1, col) && !isDeadLockBoxPos(row - 1, col) && notWall(row - 2, col))
                     {
                         sets_push.push_back({AddBoxLiteral(row - 1, col, box, t - 1), AddPlayerLiteral(row - 2, col, player, t - 1), AddPlayerLiteral(row - 1, col, player, t)});
                     }
-                    if (row + 2 < mapSize.first && mapInfo["Walls"].end() == find(mapInfo["Walls"].begin(), mapInfo["Walls"].end(), make_pair(row + 1, col)) &&
-                        mapInfo["Walls"].end() == find(mapInfo["Walls"].begin(), mapInfo["Walls"].end(), make_pair(row + 2, col)))
+                    if (row + 2 < mapSize.first && notWall(row + 1, col) && !isDeadLockBoxPos(row + 1, col) &&
+                        notWall(row + 2, col))
                     {
                         sets_push.push_back({AddBoxLiteral(row + 1, col, box, t - 1), AddPlayerLiteral(row + 2, col, player, t - 1), AddPlayerLiteral(row + 1, col, player, t)});
                     }
-                    if (col + 2 < mapSize.second && mapInfo["Walls"].end() == find(mapInfo["Walls"].begin(), mapInfo["Walls"].end(), make_pair(row, col + 1)) &&
-                        mapInfo["Walls"].end() == find(mapInfo["Walls"].begin(), mapInfo["Walls"].end(), make_pair(row, col + 2)))
+                    if (col + 2 < mapSize.second && notWall(row, col + 1) && !isDeadLockBoxPos(row, col + 1) &&
+                        notWall(row, col + 2))
                     {
                         sets_push.push_back({AddBoxLiteral(row, col + 1, box, t - 1), AddPlayerLiteral(row, col + 2, player, t - 1), AddPlayerLiteral(row, col + 1, player, t)});
                     }
-                    if (col - 2 >= 0 && mapInfo["Walls"].end() == find(mapInfo["Walls"].begin(), mapInfo["Walls"].end(), make_pair(row, col - 1)) &&
-                        mapInfo["Walls"].end() == find(mapInfo["Walls"].begin(), mapInfo["Walls"].end(), make_pair(row, col - 2)))
+                    if (col - 2 >= 0 && notWall(row, col - 1) && !isDeadLockBoxPos(row, col - 1) &&
+                        notWall(row, col - 2))
                     {
                         sets_push.push_back({AddBoxLiteral(row, col - 1, box, t - 1), AddPlayerLiteral(row, col - 2, player, t - 1), AddPlayerLiteral(row, col - 1, player, t)});
                     }
@@ -365,6 +392,8 @@ void SokobanSolver::BoxSinglePlacementConstraints()
     {
         int row = walkable_coord.first;
         int col = walkable_coord.second;
+        if (isDeadLockBoxPos(row, col))
+            continue;
         validPositions.push_back({row, col});
     }
 
@@ -398,6 +427,8 @@ void SokobanSolver::BoxCollisionConstraints() // should be on different position
             {
                 int row = walkable_coord.first;
                 int col = walkable_coord.second;
+                if (isDeadLockBoxPos(row, col))
+                    continue;
                 for (int t = 1; t <= stepLimit; t++)
                 {
                     Clause *newClause = new Clause;
@@ -421,6 +452,8 @@ void SokobanSolver::BoxAndPlayerCollisionConstraints()
             {
                 int row = walkable_coord.first;
                 int col = walkable_coord.second;
+                if (isDeadLockBoxPos(row, col))
+                    continue;
                 for (int t = 1; t <= stepLimit; t++)
                 {
                     Clause *newClause = new Clause;
@@ -473,7 +506,7 @@ void SokobanSolver::PlayerHeadOnConstraints() // vertical
                 for (int t = 1; t < stepLimit; t++)
                 {
                     // consider boundary conditions
-                    if (mapInfo["Walls"].end() == find(mapInfo["Walls"].begin(), mapInfo["Walls"].end(), make_pair(row, col + 1)))
+                    if (notWall(row, col + 1))
                     {
                         Clause *newClause1 = new Clause;
                         newClause1->AddLit(~(AddPlayerLiteral(row, col, player1, t)));
@@ -503,7 +536,7 @@ void SokobanSolver::PlayerHeadOnConstraints() // vertical
                 int col = walkable_coord.second;
                 for (int t = 1; t < stepLimit; t++)
                 {
-                    if (mapInfo["Walls"].end() == find(mapInfo["Walls"].begin(), mapInfo["Walls"].end(), make_pair(row + 1, col)))
+                    if (notWall(row + 1, col))
                     {
                         // consider boundary conditions
                         Clause *newClause1 = new Clause;
@@ -547,7 +580,7 @@ void SokobanSolver::InitState()
         {
             for (int col = 0; col < mapSize.second; col++)
             {
-                if (!(row == playerPos_row && col == playerPos_col) && mapInfo["Walls"].end() == find(mapInfo["Walls"].begin(), mapInfo["Walls"].end(), make_pair(row, col)))
+                if (!(row == playerPos_row && col == playerPos_col) && notWall(row, col))
                 {
                     Clause *NotPlayerClause = new Clause();
                     NotPlayerClause->AddLit(~(AddPlayerLiteral(row, col, player, 0)));
@@ -568,7 +601,7 @@ void SokobanSolver::InitState()
         {
             for (int col = 0; col < mapSize.second; col++)
             {
-                if (!(row == boxPos_row && col == boxPos_col) && mapInfo["Walls"].end() == find(mapInfo["Walls"].begin(), mapInfo["Walls"].end(), make_pair(row, col)))
+                if (!(row == boxPos_row && col == boxPos_col) && (notWall(row, col) || isDeadLockBoxPos(row, col)))
                 {
                     Clause *NotBoxClause = new Clause();
                     NotBoxClause->AddLit(~(AddBoxLiteral(row, col, box, 0)));
@@ -634,10 +667,167 @@ void SokobanSolver::ExistenceConstraints()
         }
     }
 }
+void SokobanSolver::bfs(vector<vector<char>> &underlyingTiles, vector<vector<bool>> &visited, vector<pair<int, int>> &group, int i, int j)
+{
+    visited[i][j] = true;
+    group.push_back(make_pair(i, j));
+
+    // up (need the down tile to be empty)
+    if (i > 0 && !isWall(i - 1, j) && !visited[i - 1][j] && !isWall(i + 1, j))
+    {
+        bfs(underlyingTiles, visited, group, i - 1, j);
+    }
+    // down (need the up tile to be empty)
+    if (i < mapSize.first - 1 && !isWall(i + 1, j) && !visited[i + 1][j] && !isWall(i - 1, j))
+    {
+        bfs(underlyingTiles, visited, group, i + 1, j);
+    }
+    // left (need the right tile to be empty)
+    if (j > 0 && !isWall(i, j - 1) && !visited[i][j - 1] && !isWall(i, j + 1))
+    {
+        bfs(underlyingTiles, visited, group, i, j - 1);
+    }
+    // right (need the left tile to be empty)
+    if (j < mapSize.second - 1 && !isWall(i, j + 1) && !visited[i][j + 1] && !isWall(i, j - 1))
+    {
+        bfs(underlyingTiles, visited, group, i, j + 1);
+    }
+    return;
+}
+
+void SokobanSolver::findDeadLockBoxPos()
+{
+    vector<vector<char>> underlyingTiles(mapSize.first, vector<char>(mapSize.second, ' '));
+    for (int i = 0; i < mapSize.first; i++)
+    {
+        for (int j = 0; j < mapSize.second; j++)
+        {
+            if (isWall(i, j))
+                underlyingTiles[i][j] = 'W';
+            if (isTarget(i, j))
+                underlyingTiles[i][j] = 'T';
+        }
+    }
+    int deadGroupCount = 0;
+    deadLockBoxPos.clear();
+    // BFS to find all the dead lock box positions
+    for (int i = 0; i < mapSize.first; i++)
+    {
+        for (int j = 0; j < mapSize.second; j++)
+        {
+            if (underlyingTiles[i][j] != ' ')
+                continue;
+            // BFS
+            vector<vector<bool>> visited(mapSize.first, vector<bool>(mapSize.second, false));
+            vector<pair<int, int>> group;
+            group.push_back(make_pair(i, j));
+            bfs(underlyingTiles, visited, group, i, j);
+
+            // if there is a target in the group, then it is not a dead lock
+            bool isDeadLock = true;
+            for (auto pos : group)
+            {
+                if (underlyingTiles[pos.first][pos.second] == 'T')
+                {
+                    isDeadLock = false;
+                    break;
+                }
+            }
+            if (isDeadLock)
+            {
+                for (auto pos : group)
+                {
+                    if (underlyingTiles[pos.first][pos.second] == ' ')
+                    {
+                        underlyingTiles[pos.first][pos.second] = char(deadGroupCount + '0');
+                        deadLockBoxPos.push_back(pos);
+                    }
+                }
+                deadGroupCount++;
+            }
+        }
+    }
+
+    cout << "Num of dead lock box positions: " << deadLockBoxPos.size() << endl;
+    vector<vector<char>> deadLockBoxPosStr(mapSize.first, vector<char>(mapSize.second, ' '));
+    /*for (int i = 0; i < mapSize.first; i++)
+    {
+        for (int j = 0; j < mapSize.second; j++)
+        {
+            if (isWall(i, j))
+                cout << "W";
+            else if (underlyingTiles[i][j] != ' ')
+                cout << underlyingTiles[i][j];
+            else
+                cout << " ";
+        }
+        cout << endl;
+    }*/
+
+    // deadLockBoxPosMap
+    deadLockBoxPosMap = vector<vector<bool>>(mapSize.first, vector<bool>(mapSize.second, false));
+    for (const auto &d : deadLockBoxPos)
+    {
+        int i = d.first;
+        int j = d.second;
+        deadLockBoxPosMap[i][j] = true;
+    }
+}
+void SokobanSolver::TunnelIdentifying()
+{
+    // find tunnel in the map
+    // create constraints for B in tunnel and P at the right place
+    // Find tunnels in the map
+    vector<pair<int, int>> tunnels;
+
+    for (auto walkable_coord : mapInfo["Walkable"])
+    {
+        int row = walkable_coord.first;
+        int col = walkable_coord.second;
+
+        // Check for horizontal tunnel
+        if (row > 0 && row < mapSize.first - 1 &&
+            isWall(row - 1, col) &&
+            isWall(row + 1, col))
+        {
+            // Check if left and right are walkable
+            if ((col > 0 && isWalkable(row, col - 1)) ||
+                (col < mapSize.second - 1 && isWalkable(row, col + 1)))
+            {
+                tunnels.push_back(make_pair(row, col));
+                continue;
+            }
+        }
+
+        // Check for vertical tunnel
+        if (col > 0 && col < mapSize.second - 1 &&
+            isWall(row, col - 1) &&
+            isWall(row, col + 1))
+        {
+            // Check if up and down are walkable
+            if ((row > 0 && isWalkable(row - 1, col)) ||
+                (row < mapSize.first - 1 && isWalkable(row + 1, col)))
+            {
+                tunnels.push_back(make_pair(row, col));
+            }
+        }
+    }
+
+    // Store tunnels in mapInfo
+    mapInfo["Tunnels"] = tunnels;
+
+    // Debug output
+    cout << "Identified Tunnels:" << endl;
+    for (const auto &tunnel : tunnels)
+    {
+        cout << "(" << tunnel.first << ", " << tunnel.second << ")" << endl;
+    }
+}
 void SokobanSolver::AllConstraints()
 {
     InitState();
     SolvedState();
+    TunnelIdentifying();
     PlayerMovementConstraints();
     BoxPushMovementConstraints();
     PlayerHeadOnConstraints(); // MA

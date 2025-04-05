@@ -81,6 +81,33 @@ public:
 
     // experimental constraints
     void LearntConstraints();
+    void TunnelIdentifying();
+    inline bool notWall(int row, int col)
+    {
+        return find(mapInfo["Walls"].begin(), mapInfo["Walls"].end(), make_pair(row, col)) == mapInfo["Walls"].end();
+    }
+    inline bool isWall(int row, int col)
+    {
+        return find(mapInfo["Walls"].begin(), mapInfo["Walls"].end(), make_pair(row, col)) != mapInfo["Walls"].end();
+    }
+    inline bool isWalkable(int row, int col)
+    {
+        return find(mapInfo["Walkable"].begin(), mapInfo["Walkable"].end(), make_pair(row, col)) != mapInfo["Walkable"].end();
+    }
+    inline bool isTarget(int row, int col)
+    {
+        return mapInfo["Targets"].end() != find(mapInfo["Targets"].begin(), mapInfo["Targets"].end(), make_pair(row, col));
+    }
+    // heuristic
+    void findDeadLockBoxPos();
+    vector<pair<int, int>> deadLockBoxPos;
+    vector<vector<bool>> deadLockBoxPosMap;
+
+    inline bool isDeadLockBoxPos(int row, int col)
+    {
+        return deadLockBoxPosMap[row][col];
+    }
+    void bfs(vector<vector<char>> &underlyingTiles, vector<vector<bool>> &visited, vector<pair<int, int>> &group, int i, int j);
 
     // Initial State
     void InitState();
