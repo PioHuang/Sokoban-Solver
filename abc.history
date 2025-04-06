@@ -32,8 +32,9 @@ sokoban maps/level_1.txt
 sokoban maps/level_1.txt1
 sokoban maps/level_7.txt 1
 sokoban maps/level_6.txt
-sokoban maps/level_6.txt 1
-sokoban maps/level_3.txt 1
 sokoban maps/level_5.txt 1
-source -s abc.rc
+sokoban maps/level_10.txt 1
 sokoban maps/level_1.txt 1
+source -s abc.rc
+sokoban maps/level_3.txt 1
+sokoban maps/level_6.txt 1

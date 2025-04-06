@@ -263,6 +263,7 @@ void SokobanSolver::PlayerMovementConstraints()
             }
         }
     }
+
     for (int t = 1; t <= stepLimit; t++)
     {
         for (int player = 0; player < playerNum; player++)
@@ -312,18 +313,15 @@ void SokobanSolver::BoxPushMovementConstraints()
                     {
                         sets_push.push_back({AddBoxLiteral(row - 1, col, box, t - 1), AddPlayerLiteral(row - 2, col, player, t - 1), AddPlayerLiteral(row - 1, col, player, t)});
                     }
-                    if (row + 2 < mapSize.first && notWall(row + 1, col) && !isDeadLockBoxPos(row + 1, col) &&
-                        notWall(row + 2, col))
+                    if (row + 2 < mapSize.first && notWall(row + 1, col) && !isDeadLockBoxPos(row + 1, col) && notWall(row + 2, col))
                     {
                         sets_push.push_back({AddBoxLiteral(row + 1, col, box, t - 1), AddPlayerLiteral(row + 2, col, player, t - 1), AddPlayerLiteral(row + 1, col, player, t)});
                     }
-                    if (col + 2 < mapSize.second && notWall(row, col + 1) && !isDeadLockBoxPos(row, col + 1) &&
-                        notWall(row, col + 2))
+                    if (col + 2 < mapSize.second && notWall(row, col + 1) && !isDeadLockBoxPos(row, col + 1) && notWall(row, col + 2))
                     {
                         sets_push.push_back({AddBoxLiteral(row, col + 1, box, t - 1), AddPlayerLiteral(row, col + 2, player, t - 1), AddPlayerLiteral(row, col + 1, player, t)});
                     }
-                    if (col - 2 >= 0 && notWall(row, col - 1) && !isDeadLockBoxPos(row, col - 1) &&
-                        notWall(row, col - 2))
+                    if (col - 2 >= 0 && notWall(row, col - 1) && !isDeadLockBoxPos(row, col - 1) && notWall(row, col - 2))
                     {
                         sets_push.push_back({AddBoxLiteral(row, col - 1, box, t - 1), AddPlayerLiteral(row, col - 2, player, t - 1), AddPlayerLiteral(row, col - 1, player, t)});
                     }
@@ -601,7 +599,9 @@ void SokobanSolver::InitState()
         {
             for (int col = 0; col < mapSize.second; col++)
             {
-                if (!(row == boxPos_row && col == boxPos_col) && (notWall(row, col) || isDeadLockBoxPos(row, col)))
+                if (isDeadLockBoxPos(row, col))
+                    continue;
+                if (!(row == boxPos_row && col == boxPos_col) && (notWall(row, col)))
                 {
                     Clause *NotBoxClause = new Clause();
                     NotBoxClause->AddLit(~(AddBoxLiteral(row, col, box, 0)));
@@ -653,20 +653,6 @@ void SokobanSolver::LearntConstraints() // slows down the process!
     }
 }
 
-void SokobanSolver::ExistenceConstraints()
-{
-    // cout << "Adding existence constraints..." << endl;
-    for (int box = 0; box < boxNum; box++)
-    {
-        for (int t = 0; t <= stepLimit; t++)
-        {
-            Clause *newClause = new Clause;
-            for (auto walkable_coord : mapInfo["Walkable"])
-                newClause->AddLit(AddBoxLiteral(walkable_coord.first, walkable_coord.second, box, t));
-            AddClause(newClause);
-        }
-    }
-}
 void SokobanSolver::bfs(vector<vector<char>> &underlyingTiles, vector<vector<bool>> &visited, vector<pair<int, int>> &group, int i, int j)
 {
     visited[i][j] = true;
@@ -750,7 +736,7 @@ void SokobanSolver::findDeadLockBoxPos()
 
     cout << "Num of dead lock box positions: " << deadLockBoxPos.size() << endl;
     vector<vector<char>> deadLockBoxPosStr(mapSize.first, vector<char>(mapSize.second, ' '));
-    /*for (int i = 0; i < mapSize.first; i++)
+    for (int i = 0; i < mapSize.first; i++)
     {
         for (int j = 0; j < mapSize.second; j++)
         {
@@ -762,8 +748,7 @@ void SokobanSolver::findDeadLockBoxPos()
                 cout << " ";
         }
         cout << endl;
-    }*/
-
+    }
     // deadLockBoxPosMap
     deadLockBoxPosMap = vector<vector<bool>>(mapSize.first, vector<bool>(mapSize.second, false));
     for (const auto &d : deadLockBoxPos)
@@ -773,46 +758,77 @@ void SokobanSolver::findDeadLockBoxPos()
         deadLockBoxPosMap[i][j] = true;
     }
 }
+
+void SokobanSolver::ExistenceConstraints()
+{
+    // cout << "Adding existence constraints..." << endl;
+    for (int t = 1; t < stepLimit; t++)
+    {
+        for (int box = 0; box < boxNum; box++)
+        {
+            Clause *newClause = new Clause;
+            for (auto walkable_coord : mapInfo["Walkable"])
+            {
+                int row = walkable_coord.first;
+                int col = walkable_coord.second;
+                if (isDeadLockBoxPos(row, col))
+                    continue;
+                newClause->AddLit(AddBoxLiteral(row, col, box, t));
+            }
+            AddClause(newClause);
+        }
+    }
+}
+
+void SokobanSolver::helper(vector<vector<int>> &tunnel_map, int row, int col, int index)
+{
+    int id = index + 1;
+    tunnel_map[row][col] = -1;
+    // base case
+    if (notWall(row - 1, col) || notWall(row + 1, col))
+        return;
+    helper(tunnel_map, row, col + 1, index);
+    tunnel_map[row][col] = id;
+    return;
+}
 void SokobanSolver::TunnelIdentifying()
 {
     // find tunnel in the map
     // create constraints for B in tunnel and P at the right place
     // Find tunnels in the map
     vector<pair<int, int>> tunnels;
+    vector<vector<int>> tunnel_map(mapSize.first, vector<int>(mapSize.second, 0));
 
-    for (auto walkable_coord : mapInfo["Walkable"])
+    for (int row = 1; row < mapSize.first - 1; row++)
     {
-        int row = walkable_coord.first;
-        int col = walkable_coord.second;
-
-        // Check for horizontal tunnel
-        if (row > 0 && row < mapSize.first - 1 &&
-            isWall(row - 1, col) &&
-            isWall(row + 1, col))
+        for (int col = 1; col < mapSize.second - 1; col++)
         {
-            // Check if left and right are walkable
-            if ((col > 0 && isWalkable(row, col - 1)) ||
-                (col < mapSize.second - 1 && isWalkable(row, col + 1)))
-            {
-                tunnels.push_back(make_pair(row, col));
+            if (!isWalkable(row, col) || tunnel_map[row][col] != 0)
                 continue;
-            }
-        }
-
-        // Check for vertical tunnel
-        if (col > 0 && col < mapSize.second - 1 &&
-            isWall(row, col - 1) &&
-            isWall(row, col + 1))
-        {
-            // Check if up and down are walkable
-            if ((row > 0 && isWalkable(row - 1, col)) ||
-                (row < mapSize.first - 1 && isWalkable(row + 1, col)))
+            // Check for horizontal tunnel
+            if (isWall(row - 1, col) && isWall(row + 1, col))
             {
-                tunnels.push_back(make_pair(row, col));
+                // Check if left and right are walkable
+                if ((col > 0 && isWalkable(row, col - 1)) &&
+                    (col < mapSize.second - 1 && isWalkable(row, col + 1)))
+                {
+                    tunnel_map[row][col] = 1; // tunnel entry
+                    helper(tunnel_map, row, col, 1);
+                }
+            }
+            // Check for vertical tunnel
+            if (isWall(row, col - 1) && isWall(row, col + 1))
+            {
+                // Check if up and down are walkable
+                if ((row > 0 && isWalkable(row - 1, col)) &&
+                    (row < mapSize.first - 1 && isWalkable(row + 1, col)))
+                {
+                    tunnel_map[row][col] = 1; // tunnel entry
+                    helper(tunnel_map, row, col, 1);
+                }
             }
         }
     }
-
     // Store tunnels in mapInfo
     mapInfo["Tunnels"] = tunnels;
 
@@ -827,16 +843,16 @@ void SokobanSolver::AllConstraints()
 {
     InitState();
     SolvedState();
-    TunnelIdentifying();
+    // TunnelIdentifying();
     PlayerMovementConstraints();
     BoxPushMovementConstraints();
-    PlayerHeadOnConstraints(); // MA
+    // PlayerHeadOnConstraints(); // MA
     PlayerSinglePlacementConstraints();
     BoxSinglePlacementConstraints();
-    PlayerCollisionConstraints(); // MA
+    // PlayerCollisionConstraints(); // MA
     BoxCollisionConstraints();
     BoxAndPlayerCollisionConstraints();
-    // ExistenceConstraints();
+    ExistenceConstraints();
     // ObstacleConstraints();
     // LearntConstraints();
 }

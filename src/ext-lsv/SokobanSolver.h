@@ -82,6 +82,7 @@ public:
     // experimental constraints
     void LearntConstraints();
     void TunnelIdentifying();
+    void helper(vector<vector<int>> &tunnel_map, int row, int col, int index);
     inline bool notWall(int row, int col)
     {
         return find(mapInfo["Walls"].begin(), mapInfo["Walls"].end(), make_pair(row, col)) == mapInfo["Walls"].end();
