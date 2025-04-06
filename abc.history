@@ -33,8 +33,22 @@ sokoban maps/level_1.txt1
 sokoban maps/level_7.txt 1
 sokoban maps/level_6.txt
 sokoban maps/level_5.txt 1
+sokoban maps/level_6.txt 1
 sokoban maps/level_10.txt 1
 sokoban maps/level_1.txt 1
-source -s abc.rc
-sokoban maps/level_3.txt 1
+quot
+sokoban filled/microban_5.txt 1
+sokoban filled/microban_4.txt 1
+sokoban filled/microban_8.txt 2
+sokoban filled/microban_1.txt 1
 sokoban maps/level_6.txt 1
+sokoban maps/level_10.txt 1
+sokoban maps/level_3.txt 1
+sokoban filled/microban_8.txt 1
+sokoban filled/microban_9.txt 1
+sokoban filled/microban_7.txt 1
+sokoban filled/microban_5.txt 1
+sokoban filled/microban_3.txt 1
+sokoban filled/microban_11.txt 1
+source -s abc.rc
+sokoban filled/microban_12.txt 1

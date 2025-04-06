@@ -78,6 +78,7 @@ public:
     void BoxAndPlayerCollisionConstraints(); // 8
     void ExistenceConstraints();             // 9
     void ObstacleConstraints();              // 10
+    void DebugConstraints();                 // 11
 
     // experimental constraints
     void LearntConstraints();

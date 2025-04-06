@@ -215,24 +215,21 @@ vector<vector<Lit>> cartesianProduct(const vector<set<Lit>> &sets)
         if (set.empty())
             continue;
         vector<vector<Lit>> temp;
-        for (const auto &combination : result) // for each set in current result
+        for (const auto &combination : result)
         {
-            unordered_set<Lit, LitHash> seen(combination.begin(), combination.end());
             for (const auto &lit : set)
             {
-                if (seen.find(lit) == seen.end())
-                {
-                    vector<Lit> newCombination = combination;
-                    newCombination.push_back(lit);
-                    temp.push_back(newCombination);
-                }
+                vector<Lit> newCombination = combination;
+                newCombination.push_back(lit);
+                temp.push_back(move(newCombination)); // Use move to avoid unnecessary copying
             }
         }
-        result = move(temp); // resource transfer
+
+        result = move(temp); // Efficiently transfer ownership of the temporary result
     }
+
     return result;
 }
-
 void SokobanSolver::PlayerMovementConstraints()
 {
     // cout << "Adding player movement constraints..." << endl;
@@ -292,14 +289,14 @@ void SokobanSolver::PlayerMovementConstraints()
 void SokobanSolver::BoxPushMovementConstraints()
 {
     // cout << "Adding box push movement constraints..." << endl;
-    for (int box = 0; box < boxNum; box++)
+    for (auto walkable_coord : mapInfo["Walkable"])
     {
-        for (auto walkable_coord : mapInfo["Walkable"])
+        int row = walkable_coord.first;
+        int col = walkable_coord.second;
+        if (isDeadLockBoxPos(row, col))
+            continue;
+        for (int box = 0; box < boxNum; box++)
         {
-            int row = walkable_coord.first;
-            int col = walkable_coord.second;
-            if (isDeadLockBoxPos(row, col))
-                continue;
             for (int t = 1; t <= stepLimit; t++) // all time steps except first state t = 0
             {
                 // initialize the sets to be taken cartesian products, that is, get all the variables appeared in the constraint
@@ -345,6 +342,36 @@ void SokobanSolver::BoxPushMovementConstraints()
                         AddClause(newClause);
                     }
                 }
+            }
+        }
+    }
+}
+
+void SokobanSolver::DebugConstraints()
+{
+    for (auto walkable_coord : mapInfo["Walkable"])
+    {
+        int row = walkable_coord.first;
+        int col = walkable_coord.second;
+        if (isDeadLockBoxPos(row, col))
+            continue;
+        for (int box = 0; box < boxNum; box++)
+        {
+            for (int t = 1; t <= stepLimit; t++)
+            {
+                vector<pair<int, int>> dir = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+                Clause *newClause = new Clause;
+                newClause->AddLit(~(AddBoxLiteral(row, col, box, t)));
+                newClause->AddLit(AddBoxLiteral(row, col, box, t - 1));
+                for (const auto &dir_pair : dir)
+                {
+                    int row_dir = dir_pair.first;
+                    int col_dir = dir_pair.second;
+                    if (row + row_dir >= 0 && row + row_dir < mapSize.first && col + col_dir >= 0 && col + col_dir < mapSize.second && !isDeadLockBoxPos(row + row_dir, col + col_dir) && notWall(row + row_dir, col + col_dir))
+                        newClause->AddLit(AddBoxLiteral(row + row_dir, col + col_dir, box, t - 1));
+                }
+                // cout << "Adding Debug Constraint for Box " << box << " at (" << row << ", " << col << ") at time " << t << endl;
+                AddClause(newClause);
             }
         }
     }
@@ -813,7 +840,7 @@ void SokobanSolver::TunnelIdentifying()
                     (col < mapSize.second - 1 && isWalkable(row, col + 1)))
                 {
                     tunnel_map[row][col] = 1; // tunnel entry
-                    helper(tunnel_map, row, col, 1);
+                    helper(tunnel_map, row, col + 1, 1);
                 }
             }
             // Check for vertical tunnel
@@ -824,7 +851,7 @@ void SokobanSolver::TunnelIdentifying()
                     (row < mapSize.first - 1 && isWalkable(row + 1, col)))
                 {
                     tunnel_map[row][col] = 1; // tunnel entry
-                    helper(tunnel_map, row, col, 1);
+                    helper(tunnel_map, row + 1, col, 1);
                 }
             }
         }
@@ -843,7 +870,7 @@ void SokobanSolver::AllConstraints()
 {
     InitState();
     SolvedState();
-    // TunnelIdentifying();
+    TunnelIdentifying();
     PlayerMovementConstraints();
     BoxPushMovementConstraints();
     // PlayerHeadOnConstraints(); // MA
@@ -853,6 +880,7 @@ void SokobanSolver::AllConstraints()
     BoxCollisionConstraints();
     BoxAndPlayerCollisionConstraints();
     ExistenceConstraints();
+    DebugConstraints();
     // ObstacleConstraints();
     // LearntConstraints();
 }
