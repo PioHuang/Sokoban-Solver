@@ -33,13 +33,14 @@ struct PackageRegistrationManager
 } lsvPackageRegistrationManager;
 int Sokoban_CommandSolve(Abc_Frame_t *pAbc, int argc, char **argv)
 {
-    if (argc != 3)
+    if (argc != 4)
     {
-        cerr << "Usage: " << argv[0] << " <map file path> <run type>" << std::endl;
+        cerr << "Usage: " << argv[0] << " <map file path> <run type> <verbose>" << std::endl;
         return 1;
     }
     const char *map = argv[1];
     int runType = atoi(argv[2]);
+    int verbose = atoi(argv[3]);
     if (runType == 1)
     {
         using namespace std::chrono;
@@ -49,6 +50,7 @@ int Sokoban_CommandSolve(Abc_Frame_t *pAbc, int argc, char **argv)
         {
             SokobanSolver Solver;
             Solver.setStepLimit(step);
+            Solver.verbose = verbose;
             Solver.loadMap(map);
             sat_solver *pSat = sat_solver_new();
             Solver.AllConstraints();
@@ -72,10 +74,18 @@ int Sokoban_CommandSolve(Abc_Frame_t *pAbc, int argc, char **argv)
             {
                 vector<int> true_literals;
                 auto stop = high_resolution_clock::now();
-                auto duration = duration_cast<seconds>(stop - start);
+                auto duration = duration_cast<microseconds>(stop - start);
                 cout << "Solution found at: " << step << " steps" << endl;
-                cout << "BMC search duration: " << duration.count() << " seconds" << endl;
+                double duration_seconds = duration.count() / 1e6; // Convert microseconds to seconds
 
+                // Round to three decimal places
+                duration_seconds = round(duration_seconds * 1000) / 1000.0;
+                cout << "BMC search duration: " << duration_seconds << " seconds" << endl;
+
+                if (!verbose)
+                {
+                    return 0;
+                }
                 unordered_map<int, Lit> LitDictionary = Solver.get_LitDictionary();
                 for (int index = 0; index < LitDictionary.size(); index++)
                 {

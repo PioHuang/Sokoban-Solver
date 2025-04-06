@@ -138,6 +138,8 @@ public:
     unordered_map<string, vector<pair<int, int>>> &
     get_mapInfo() { return mapInfo; }
 
+    int verbose;
+
 private:
     string mapName;
     int stepLimit;

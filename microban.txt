@@ -1,0 +1,23 @@
+UC Berkeley, ABC 1.01 (compiled Dec 21 2024 00:30:19)
+================== Command history ==================
+01> sokoban filled/microban_48.txt 1 0
+01> sokoban filled/microban_49.txt 1 0
+01> sokoban filled/microban_50.txt 1 0
+source -s abc.rc
+sokoban filled/microban_1.txt 1 0
+sokoban filled/microban_2.txt 1 0
+sokoban filled/microban_3.txt 1 0
+sokoban filled/microban_4.txt 1 0
+sokoban filled/microban_5.txt 1 0
+sokoban filled/microban_6.txt 1 0
+=====================================================
+Solution found at: 33 steps
+BMC search duration: 0.315 seconds
+Solution found at: 16 steps
+BMC search duration: 0.033 seconds
+Solution found at: 41 steps
+BMC search duration: 1.819 seconds
+Solution found at: 23 steps
+BMC search duration: 0.158 seconds
+Solution found at: 25 steps
+BMC search duration: 1.81 seconds

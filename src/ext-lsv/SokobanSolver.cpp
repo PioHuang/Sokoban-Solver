@@ -173,7 +173,8 @@ void SokobanSolver::loadMap(const string &filename)
     // cout << "PlayerNum: " << playerNum << endl;
     // cout << "BoxNum: " << boxNum << endl;
     findDeadLockBoxPos();
-    cout << "Time steps: " << stepLimit << endl;
+    if (verbose)
+        cout << "Time steps: " << stepLimit << endl;
 }
 void SokobanSolver::setStepLimit(int limit)
 {
@@ -761,9 +762,10 @@ void SokobanSolver::findDeadLockBoxPos()
         }
     }
 
-    cout << "Num of dead lock box positions: " << deadLockBoxPos.size() << endl;
+    if (verbose)
+        cout << "Num of dead lock box positions: " << deadLockBoxPos.size() << endl;
     vector<vector<char>> deadLockBoxPosStr(mapSize.first, vector<char>(mapSize.second, ' '));
-    for (int i = 0; i < mapSize.first; i++)
+    /*for (int i = 0; i < mapSize.first; i++)
     {
         for (int j = 0; j < mapSize.second; j++)
         {
@@ -775,7 +777,7 @@ void SokobanSolver::findDeadLockBoxPos()
                 cout << " ";
         }
         cout << endl;
-    }
+    }*/
     // deadLockBoxPosMap
     deadLockBoxPosMap = vector<vector<bool>>(mapSize.first, vector<bool>(mapSize.second, false));
     for (const auto &d : deadLockBoxPos)
@@ -860,10 +862,13 @@ void SokobanSolver::TunnelIdentifying()
     mapInfo["Tunnels"] = tunnels;
 
     // Debug output
-    cout << "Identified Tunnels:" << endl;
-    for (const auto &tunnel : tunnels)
+    if (verbose)
     {
-        cout << "(" << tunnel.first << ", " << tunnel.second << ")" << endl;
+        cout << "Identified Tunnels:" << endl;
+        for (const auto &tunnel : tunnels)
+        {
+            cout << "(" << tunnel.first << ", " << tunnel.second << ")" << endl;
+        }
     }
 }
 void SokobanSolver::AllConstraints()
