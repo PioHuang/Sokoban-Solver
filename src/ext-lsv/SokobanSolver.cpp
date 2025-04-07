@@ -333,15 +333,15 @@ void SokobanSolver::BoxPushMovementConstraints()
                 // some sets might be {{}} since no push backs before
                 for (const auto &set : Cartesian_push)
                 {
+                    Clause *newClause = new Clause;
+                    newClause->AddLit(~(AddBoxLiteral(row, col, box, t)));
+                    newClause->AddLit(AddBoxLiteral(row, col, box, t - 1));
                     if (!set.empty())
                     {
-                        Clause *newClause = new Clause;
-                        newClause->AddLit(~(AddBoxLiteral(row, col, box, t)));
-                        newClause->AddLit(AddBoxLiteral(row, col, box, t - 1));
                         for (const auto &lit : set)
                             newClause->AddLit(lit);
-                        AddClause(newClause);
                     }
+                    AddClause(newClause);
                 }
             }
         }
@@ -765,19 +765,6 @@ void SokobanSolver::findDeadLockBoxPos()
     if (verbose)
         cout << "Num of dead lock box positions: " << deadLockBoxPos.size() << endl;
     vector<vector<char>> deadLockBoxPosStr(mapSize.first, vector<char>(mapSize.second, ' '));
-    /*for (int i = 0; i < mapSize.first; i++)
-    {
-        for (int j = 0; j < mapSize.second; j++)
-        {
-            if (isWall(i, j))
-                cout << "W";
-            else if (underlyingTiles[i][j] != ' ')
-                cout << underlyingTiles[i][j];
-            else
-                cout << " ";
-        }
-        cout << endl;
-    }*/
     // deadLockBoxPosMap
     deadLockBoxPosMap = vector<vector<bool>>(mapSize.first, vector<bool>(mapSize.second, false));
     for (const auto &d : deadLockBoxPos)
@@ -809,65 +796,179 @@ void SokobanSolver::ExistenceConstraints()
     }
 }
 
-void SokobanSolver::helper(vector<vector<int>> &tunnel_map, int row, int col, int index)
-{
-    int id = index + 1;
-    tunnel_map[row][col] = -1;
+bool SokobanSolver::helper(vector<vector<int>> &tunnel_map, vector<vector<bool>> &visited, int row, int col, int index, int type, vector<pair<int, int>> &t)
+{ // dfs for tunnels
+    visited[row][col] = true;
     // base case
-    if (notWall(row - 1, col) || notWall(row + 1, col))
-        return;
-    helper(tunnel_map, row, col + 1, index);
-    tunnel_map[row][col] = id;
-    return;
+    if (type == 0) // horizontal
+    {
+        if ((notWall(row - 1, col) || notWall(row + 1, col)))
+        {
+            if (index >= 2)
+            {
+                t.push_back({row, col - 1});
+                return true;
+            }
+            else
+                return false;
+        }
+        return helper(tunnel_map, visited, row, col + 1, index + 1, 0, t);
+    }
+    else
+    { // vertical
+        if (notWall(row, col + 1) || notWall(row, col - 1))
+            if (index >= 2)
+            {
+                t.push_back({row - 1, col});
+                return true;
+            }
+            else
+                return false;
+        return helper(tunnel_map, visited, row + 1, col, index + 1, 1, t);
+    }
+    tunnel_map[row][col] = index + 1;
 }
 void SokobanSolver::TunnelIdentifying()
 {
     // find tunnel in the map
     // create constraints for B in tunnel and P at the right place
     // Find tunnels in the map
-    vector<pair<int, int>> tunnels;
+    vector<vector<bool>> visited(mapSize.first, vector<bool>(mapSize.second, false));
     vector<vector<int>> tunnel_map(mapSize.first, vector<int>(mapSize.second, 0));
 
     for (int row = 1; row < mapSize.first - 1; row++)
     {
         for (int col = 1; col < mapSize.second - 1; col++)
         {
-            if (!isWalkable(row, col) || tunnel_map[row][col] != 0)
+            if (!isWalkable(row, col) || visited[row][col])
                 continue;
             // Check for horizontal tunnel
             if (isWall(row - 1, col) && isWall(row + 1, col))
             {
+                vector<pair<int, int>> t;
                 // Check if left and right are walkable
                 if ((col > 0 && isWalkable(row, col - 1)) &&
                     (col < mapSize.second - 1 && isWalkable(row, col + 1)))
                 {
                     tunnel_map[row][col] = 1; // tunnel entry
-                    helper(tunnel_map, row, col + 1, 1);
+                    if (helper(tunnel_map, visited, row, col + 1, 1, 0, t))
+                        t.push_back({row, col});
                 }
+                if (t.size() != 0)
+                    tunnels.insert(t);
             }
             // Check for vertical tunnel
             if (isWall(row, col - 1) && isWall(row, col + 1))
             {
+                vector<pair<int, int>> t;
                 // Check if up and down are walkable
                 if ((row > 0 && isWalkable(row - 1, col)) &&
                     (row < mapSize.first - 1 && isWalkable(row + 1, col)))
                 {
                     tunnel_map[row][col] = 1; // tunnel entry
-                    helper(tunnel_map, row + 1, col, 1);
+                    if (helper(tunnel_map, visited, row + 1, col, 1, 1, t))
+                        t.push_back({row, col});
                 }
+                if (t.size() != 0)
+                    tunnels.insert(t);
             }
         }
     }
-    // Store tunnels in mapInfo
-    mapInfo["Tunnels"] = tunnels;
-
     // Debug output
     if (verbose)
     {
         cout << "Identified Tunnels:" << endl;
         for (const auto &tunnel : tunnels)
         {
-            cout << "(" << tunnel.first << ", " << tunnel.second << ")" << endl;
+            cout << "Tunnel: ";
+            for (const auto &pos : tunnel)
+            {
+                cout << "(" << pos.first << ", " << pos.second << ") ";
+            }
+            cout << endl;
+        }
+        for (int i = 0; i < mapSize.first; i++)
+        {
+            for (int j = 0; j < mapSize.second; j++)
+            {
+                if (isWall(i, j))
+                    cout << "W";
+                else if (tunnel_map[i][j] != ' ')
+                    cout << tunnel_map[i][j];
+                else
+                    cout << " ";
+            }
+            cout << endl;
+        }
+    }
+}
+void SokobanSolver::tunnelMacro()
+{
+    // player only
+    cout << "Size of tunnels: " << tunnels.size() << endl;
+
+    if (tunnels.empty())
+    {
+        cout << "ah ha i am empty" << endl;
+        return;
+    }
+    for (const auto &tunnel : tunnels)
+    {
+        // if player enters the tunnel, move through it
+        //  P(row, col-1, p, t-1) ^ P(row, col, p, t) -> P(row, col+1, p, t+1)
+        //  four directions
+        //  identify horizontal or vertical tunnel
+        if (tunnel[1].first == tunnel[0].first)
+        { // horizontal tunnel, same row
+            int tunnel_length = tunnel[0].second - tunnel[1].second + 1;
+            // 2 entries, opposite directions
+            for (int t = 1; t <= stepLimit; t++)
+            {
+                // note: Tunnel: (1, 5) (1, 3) tunnel stored this way
+                // enter from left
+                for (int curr = 0; curr < tunnel_length; curr++)
+                {
+                    Clause *newClause1 = new Clause;
+                    newClause1->AddLit(~(AddPlayerLiteral(tunnel[0].first, tunnel[1].second + curr - 1, 0, t - 1)));
+                    newClause1->AddLit(~(AddPlayerLiteral(tunnel[0].first, tunnel[1].second + curr, 0, t)));
+                    newClause1->AddLit(AddPlayerLiteral(tunnel[0].first, tunnel[1].second + curr + 1, 0, t + 1));
+                    AddClause(newClause1);
+                }
+                // enter from right
+                for (int curr = 0; curr < tunnel_length; curr++)
+                {
+                    Clause *newClause2 = new Clause;
+                    newClause2->AddLit(~(AddPlayerLiteral(tunnel[0].first, tunnel[0].second - curr + 1, 0, t - 1)));
+                    newClause2->AddLit(~(AddPlayerLiteral(tunnel[0].first, tunnel[0].second - curr, 0, t)));
+                    newClause2->AddLit(AddPlayerLiteral(tunnel[0].first, tunnel[0].second - curr - 1, 0, t + 1));
+                    AddClause(newClause2);
+                }
+            }
+        }
+        if (tunnel[1].second == tunnel[0].second) // vertical tunnel, same column
+        {
+            int tunnel_length = tunnel[0].second - tunnel[1].second + 1;
+            for (int t = 1; t <= stepLimit; t++)
+            {
+                // enter from above
+                for (int curr = 0; curr < tunnel_length; curr++)
+                {
+                    Clause *newClause1 = new Clause;
+                    newClause1->AddLit(~(AddPlayerLiteral(tunnel[1].first + curr - 1, tunnel[0].second, 0, t - 1)));
+                    newClause1->AddLit(~(AddPlayerLiteral(tunnel[1].first + curr, tunnel[0].second, 0, t)));
+                    newClause1->AddLit(AddPlayerLiteral(tunnel[1].first + curr + 1, tunnel[0].second, 0, t + 1));
+                    AddClause(newClause1);
+                }
+                // enter from bottom
+                for (int curr = 0; curr < tunnel_length; curr++)
+                {
+                    Clause *newClause2 = new Clause;
+                    newClause2->AddLit(~(AddPlayerLiteral(tunnel[0].first - curr + 1, tunnel[0].second, 0, t - 1)));
+                    newClause2->AddLit(~(AddPlayerLiteral(tunnel[0].first - curr, tunnel[0].second, 0, t)));
+                    newClause2->AddLit(AddPlayerLiteral(tunnel[0].first - curr - 1, tunnel[0].second, 0, t + 1));
+                    AddClause(newClause2);
+                }
+            }
         }
     }
 }
@@ -886,6 +987,8 @@ void SokobanSolver::AllConstraints()
     BoxAndPlayerCollisionConstraints();
     ExistenceConstraints();
     DebugConstraints();
+    // tunnelMacro();
+
     // ObstacleConstraints();
     // LearntConstraints();
 }
