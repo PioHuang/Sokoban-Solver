@@ -33,10 +33,13 @@ struct PackageRegistrationManager
 {
     PackageRegistrationManager() { Abc_FrameAddInitializer(&frame_initializer); }
 } lsvPackageRegistrationManager;
-void WriteResultsToTable(const string &mapName, bool timeout, double duration = 0.0, int steps = 0)
+void WriteResultsToTable(const string &mapPath, bool timeout, double duration = 0.0, int steps = 0)
 {
+    static bool headerWritten = false;
+    ios_base::openmode mode = headerWritten ? ios::app : ios::out; // Write mode for the first call, append mode afterward
+    string mapName = mapPath.substr(mapPath.find_last_of("/\\") + 1);
     // Open the file in append mode
-    ofstream outFile("table.txt", ios::app);
+    ofstream outFile("table.txt", mode);
 
     // Check if the file is open
     if (!outFile.is_open())
@@ -45,7 +48,6 @@ void WriteResultsToTable(const string &mapName, bool timeout, double duration = 
         return;
     }
     // Write the header if the file is empty
-    static bool headerWritten = false;
     if (!headerWritten)
     {
         outFile << left << setw(20) << "Map Name"
