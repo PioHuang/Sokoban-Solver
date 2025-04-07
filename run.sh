@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Output file
-output_file="microban.txt"
+output_file="log.txt"
 > "$output_file"  # clear existing output
 
 # Run abc and feed it sokoban commands
