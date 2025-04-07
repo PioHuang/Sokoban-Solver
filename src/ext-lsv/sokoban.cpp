@@ -14,6 +14,8 @@
 #include <thread> // For sleep
 #include <chrono> // For time delays
 #include "SokobanSolver.h"
+#include <fstream>
+#include <iomanip>
 using namespace std;
 
 static int Sokoban_CommandSolve(Abc_Frame_t *pAbc, int argc, char **argv); // command function
@@ -31,6 +33,45 @@ struct PackageRegistrationManager
 {
     PackageRegistrationManager() { Abc_FrameAddInitializer(&frame_initializer); }
 } lsvPackageRegistrationManager;
+void WriteResultsToTable(const string &mapName, bool timeout, double duration = 0.0, int steps = 0)
+{
+    // Open the file in append mode
+    ofstream outFile("table.txt", ios::app);
+
+    // Check if the file is open
+    if (!outFile.is_open())
+    {
+        cerr << "Error: Could not open table.txt for writing." << endl;
+        return;
+    }
+    // Write the header if the file is empty
+    static bool headerWritten = false;
+    if (!headerWritten)
+    {
+        outFile << left << setw(20) << "Map Name"
+                << setw(15) << "Duration (s)"
+                << setw(10) << "Steps"
+                << endl;
+        outFile << string(45, '-') << endl;
+        headerWritten = true;
+    }
+    // Write the results
+    outFile << left << setw(20) << mapName;
+    if (timeout)
+    {
+        outFile << setw(15) << "N/A"
+                << setw(10) << "N/A"
+                << endl;
+    }
+    else
+    {
+        outFile << setw(15) << fixed << setprecision(3) << duration
+                << setw(10) << steps
+                << endl;
+    }
+    // Close the file
+    outFile.close();
+}
 int Sokoban_CommandSolve(Abc_Frame_t *pAbc, int argc, char **argv)
 {
     if (argc != 4)
@@ -48,6 +89,14 @@ int Sokoban_CommandSolve(Abc_Frame_t *pAbc, int argc, char **argv)
         int step = 1;
         while (true)
         {
+            auto curr_time = high_resolution_clock::now();
+            auto TLE = hours(1);
+            if (duration_cast<seconds>(curr_time - start) >= TLE)
+            {
+                cout << "Timeout: 1 hour" << endl;
+                WriteResultsToTable(map, true);
+                return 0;
+            }
             SokobanSolver Solver;
             Solver.setStepLimit(step);
             Solver.verbose = verbose;
@@ -81,6 +130,7 @@ int Sokoban_CommandSolve(Abc_Frame_t *pAbc, int argc, char **argv)
                 // Round to three decimal places
                 duration_seconds = round(duration_seconds * 1000) / 1000.0;
                 cout << "BMC search duration: " << duration_seconds << " seconds" << endl;
+                WriteResultsToTable(map, false, duration_seconds, step);
 
                 if (!verbose)
                 {

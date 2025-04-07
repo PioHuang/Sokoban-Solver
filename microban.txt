@@ -1,4 +1,4 @@
-UC Berkeley, ABC 1.01 (compiled Dec 21 2024 00:30:19)
+UC Berkeley, ABC 1.01 (compiled Apr  7 2025 01:28:53)
 ================== Command history ==================
 01> sokoban filled/microban_48.txt 1 0
 01> sokoban filled/microban_49.txt 1 0
@@ -11,13 +11,109 @@ sokoban filled/microban_4.txt 1 0
 sokoban filled/microban_5.txt 1 0
 sokoban filled/microban_6.txt 1 0
 =====================================================
+abc 01> sokoban filled/microban_1.txt 1 0
 Solution found at: 33 steps
-BMC search duration: 0.315 seconds
+BMC search duration: 0.655 seconds
+abc 01> sokoban filled/microban_2.txt 1 0
 Solution found at: 16 steps
-BMC search duration: 0.033 seconds
+BMC search duration: 0.078 seconds
+abc 01> sokoban filled/microban_3.txt 1 0
 Solution found at: 41 steps
-BMC search duration: 1.819 seconds
+BMC search duration: 3.551 seconds
+abc 01> sokoban filled/microban_4.txt 1 0
 Solution found at: 23 steps
-BMC search duration: 0.158 seconds
+BMC search duration: 0.31 seconds
+abc 01> sokoban filled/microban_5.txt 1 0
 Solution found at: 25 steps
-BMC search duration: 1.81 seconds
+BMC search duration: 3.261 seconds
+abc 01> sokoban filled/microban_6.txt 1 0
+Solution found at: 107 steps
+BMC search duration: 464.572 seconds
+abc 01> sokoban filled/microban_7.txt 1 0
+Solution found at: 26 steps
+BMC search duration: 21.814 seconds
+abc 01> sokoban filled/microban_8.txt 1 0
+Solution found at: 97 steps
+BMC search duration: 338.369 seconds
+abc 01> sokoban filled/microban_9.txt 1 0
+Solution found at: 30 steps
+BMC search duration: 0.323 seconds
+abc 01> sokoban filled/microban_10.txt 1 0
+Solution found at: 87 steps
+BMC search duration: 844.431 seconds
+abc 01> sokoban filled/microban_11.txt 1 0
+Solution found at: 78 steps
+BMC search duration: 20.588 seconds
+abc 01> sokoban filled/microban_12.txt 1 0
+Solution found at: 49 steps
+BMC search duration: 1.205 seconds
+abc 01> sokoban filled/microban_13.txt 1 0
+Solution found at: 52 steps
+BMC search duration: 26.41 seconds
+abc 01> sokoban filled/microban_14.txt 1 0
+Solution found at: 51 steps
+BMC search duration: 1.443 seconds
+abc 01> sokoban filled/microban_15.txt 1 0
+Solution found at: 37 steps
+BMC search duration: 0.981 seconds
+abc 01> sokoban filled/microban_16.txt 1 0
+Solution found at: 100 steps
+BMC search duration: 2118.5 seconds
+abc 01> sokoban filled/microban_17.txt 1 0
+Solution found at: 25 steps
+BMC search duration: 0.438 seconds
+abc 01> sokoban filled/microban_18.txt 1 0
+Solution found at: 71 steps
+BMC search duration: 13.878 seconds
+abc 01> sokoban filled/microban_19.txt 1 0
+Solution found at: 41 steps
+BMC search duration: 5.284 seconds
+abc 01> sokoban filled/microban_20.txt 1 0
+Solution found at: 37 steps
+BMC search duration: 1.959 seconds
+abc 01> sokoban filled/microban_21.txt 1 0
+Solution found at: 17 steps
+BMC search duration: 0.053 seconds
+abc 01> sokoban filled/microban_22.txt 1 0
+Solution found at: 47 steps
+BMC search duration: 1.252 seconds
+abc 01> sokoban filled/microban_23.txt 1 0
+Solution found at: 2 steps
+BMC search duration: 0.005 seconds
+abc 01> sokoban filled/microban_24.txt 1 0
+Solution found at: 35 steps
+BMC search duration: 1.3 seconds
+abc 01> sokoban filled/microban_25.txt 1 0
+Solution found at: 29 steps
+BMC search duration: 3.195 seconds
+abc 01> sokoban filled/microban_26.txt 1 0
+Solution found at: 41 steps
+BMC search duration: 10.422 seconds
+abc 01> sokoban filled/microban_27.txt 1 0
+Solution found at: 50 steps
+BMC search duration: 12.598 seconds
+abc 01> sokoban filled/microban_28.txt 1 0
+Solution found at: 33 steps
+BMC search duration: 0.922 seconds
+abc 01> sokoban filled/microban_29.txt 1 0
+Solution found at: 104 steps
+BMC search duration: 127.063 seconds
+abc 01> sokoban filled/microban_30.txt 1 0
+Solution found at: 21 steps
+BMC search duration: 0.317 seconds
+abc 01> sokoban filled/microban_31.txt 1 0
+Solution found at: 17 steps
+BMC search duration: 0.382 seconds
+abc 01> sokoban filled/microban_32.txt 1 0
+Solution found at: 35 steps
+BMC search duration: 19.278 seconds
+abc 01> sokoban filled/microban_33.txt 1 0
+Solution found at: 41 steps
+BMC search duration: 28.327 seconds
+abc 01> sokoban filled/microban_34.txt 1 0
+Solution found at: 30 steps
+BMC search duration: 8.909 seconds
+abc 01> sokoban filled/microban_35.txt 1 0
+Solution found at: 77 steps
+BMC search duration: 4891.03 seconds
+abc 01> sokoban filled/microban_36.txt 1 0
