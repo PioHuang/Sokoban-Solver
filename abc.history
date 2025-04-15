@@ -173,12 +173,12 @@ sokoban filled/microban_23.txt 1 1
 sokoban filled/microban_84.txt 1 1
 sokoban filled/microban_3.txt 1 1
 sokoban filled/microban_3.txt 1 0
-sokoban filled/microban_55.txt 1 1
 sokoban filled/microban_59.txt 1 1
 sokoban filled/microban_71.txt 1 1
 sokoban filled/microban_149.txt 1 1
 sokoban filled/microban_60.txt 1 1
-sokoban filled/microban_38.txt 1 1
 sokoban filled/microban_6.txt 1 1
-source -s abc.rc
 sokoban filled/microban_61.txt 1 1
+sokoban filled/microban_38.txt 1 1
+source -s abc.rc
+sokoban filled/microban_55.txt 1 1

@@ -88,6 +88,11 @@ int Sokoban_CommandSolve(Abc_Frame_t *pAbc, int argc, char **argv)
     {
         using namespace std::chrono;
         auto start = high_resolution_clock::now();
+        Preprocessor preprocessor(map, verbose);
+        preprocessor.loadMap();
+        preprocessor.TunnelIdentifying();
+        preprocessor.findDeadlockPos();
+        cout << "Preprocess successful" << endl;
         int step = 1;
         while (true)
         {
@@ -99,19 +104,12 @@ int Sokoban_CommandSolve(Abc_Frame_t *pAbc, int argc, char **argv)
                 WriteResultsToTable(map, true);
                 return 0;
             }
-            SokobanSolver Solver;
+            SokobanSolver Solver(preprocessor);
             Solver.setStepLimit(step);
             Solver.verbose = verbose;
-            Solver.loadMap(map);
             sat_solver *pSat = sat_solver_new();
             Solver.AllConstraints();
             Solver.CnfWriter(pSat);
-
-            // separate the constraints
-            // increment steps, reuse previous clauses
-
-            // Solver.debugger("Debug.txt");
-            // cout << "Finished" << endl;
 
             // color code
             string black = "30";
@@ -149,10 +147,10 @@ int Sokoban_CommandSolve(Abc_Frame_t *pAbc, int argc, char **argv)
                 cout << "Steps in action: " << endl;
                 for (int t = 0; t <= step; t++)
                 {
-                    vector<vector<char>> visual(Solver.get_mapSize().first, vector<char>(Solver.get_mapSize().second, 'X'));
-                    for (const auto &wall_coord : Solver.get_mapInfo()["Walls"])
+                    vector<vector<char>> visual(preprocessor.get_mapSize().first, vector<char>(preprocessor.get_mapSize().second, 'X'));
+                    for (const auto &wall_coord : preprocessor.get_mapInfo().at("Walls"))
                         visual[wall_coord.first][wall_coord.second] = 'W';
-                    for (const auto &target_coord : Solver.get_mapInfo()["Targets"])
+                    for (const auto &target_coord : preprocessor.get_mapInfo().at("Targets"))
                         visual[target_coord.first][target_coord.second] = 'T';
                     for (auto val : true_literals)
                     {
@@ -166,9 +164,9 @@ int Sokoban_CommandSolve(Abc_Frame_t *pAbc, int argc, char **argv)
                         }
                     }
                     // print
-                    for (int row = 0; row < Solver.get_mapSize().first; row++)
+                    for (int row = 0; row < preprocessor.get_mapSize().first; row++)
                     {
-                        for (int col = 0; col < Solver.get_mapSize().second; col++)
+                        for (int col = 0; col < preprocessor.get_mapSize().second; col++)
                         {
                             switch (visual[row][col])
                             {
@@ -195,7 +193,7 @@ int Sokoban_CommandSolve(Abc_Frame_t *pAbc, int argc, char **argv)
                     {
                         cout.flush();
                         this_thread::sleep_for(chrono::seconds(1));
-                        cout << "\033[" << Solver.get_mapSize().first << "A";
+                        cout << "\033[" << preprocessor.get_mapSize().first << "A";
                     }
                 }
                 return 0;
@@ -208,17 +206,18 @@ int Sokoban_CommandSolve(Abc_Frame_t *pAbc, int argc, char **argv)
     {
         using namespace std::chrono;
         auto start = high_resolution_clock::now();
-
+        Preprocessor preprocessor(map, verbose);
+        preprocessor.loadMap();
+        preprocessor.TunnelIdentifying();
+        preprocessor.findDeadlockPos();
         int step = 1;
         int increment = 10;
         int foundStep = -1;
 
         while (true)
         {
-            SokobanSolver Solver;
+            SokobanSolver Solver(preprocessor);
             Solver.setStepLimit(step);
-            Solver.loadMap(map);
-
             sat_solver *pSat = sat_solver_new();
             Solver.AllConstraints();
             Solver.CnfWriter(pSat);
@@ -247,10 +246,8 @@ int Sokoban_CommandSolve(Abc_Frame_t *pAbc, int argc, char **argv)
         {
             int mid = low + (high - low) / 2;
 
-            SokobanSolver Solver;
+            SokobanSolver Solver(preprocessor);
             Solver.setStepLimit(mid);
-            Solver.loadMap(map);
-
             sat_solver *pSat = sat_solver_new();
             Solver.AllConstraints();
             Solver.CnfWriter(pSat);
