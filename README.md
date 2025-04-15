@@ -1,5 +1,6 @@
-# Puzzle Solving Using Modern Sat Solvers
-The Sokoban puzzle can be encoded and represented as a Bounded Model Checking (BMC) problem and solved using an SAT solver. By adopting BMC, we can determine the shortest sequence of movements required to complete the game.
+# A formal verification project: puzzle solving using modern Sat Solvers
+
+The Sokoban puzzle, a P-Space Complete problem, can be formally encoded and represented as a Bounded Model Checking (BMC) problem and solved using a SAT solver. In comparison to other simulation-based solvers (IDA\*, MCTS, etc.), this solver can find the shortest sequence of movements required to complete the puzzle. It also supports finding optimal solution for multi-agent on board, and it may also solve for testcases for which other solvers cannot solve in time (1 hour time limit).
 
 ## Installation
 
@@ -20,7 +21,7 @@ To compile the project, you will need a C++ compiler and the ABC framework.
 ## Usage
 
 The sokoban solver is integrated into the Berkeley ABC framework.
-The sokoban solver codes are within src/ext-lsv
+The sokoban solver, Preprocessor codes are located within src/ext-lsv
 First execute abc:
 
 ```sh
@@ -30,13 +31,15 @@ First execute abc:
 then run the sokoban solver with the following command:
 
 ```sh
-sokoban <map_file_path> <run_type>
+sokoban <map_file_path> <run_type> <verbose>
 ```
 
 for example:
 
 ```sh
-sokoban maps/map1.txt 1
+sokoban filled/microban_1.txt 1 1
 ```
 
-(1 for BMC, 2 for BMC with binary search)
+### Runtypes
+
+1 for BMC only, 2 for BMC with binary search

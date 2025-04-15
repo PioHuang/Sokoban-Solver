@@ -1,3 +1,3 @@
 Command line:
 make
-./Sokoban <stepLimit> <map1.txt>
+./Sokoban <map_name> <run_type> <verbose>
