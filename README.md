@@ -1,6 +1,6 @@
 # A formal verification project: puzzle solving using modern Sat Solvers
 
-The Sokoban puzzle, a P-Space Complete problem, can be formally encoded and represented as a Bounded Model Checking (BMC) problem and solved using a SAT solver. This work implements a SAT-based Sokoban Solver while exploring multiple means to reduce variable/clause count, heuristics. In comparison to other simulation-based solvers (IDA\*, MCTS, etc.), this solver can find the shortest sequence of movements required to complete the puzzle. It also supports finding optimal solution for multi-agent on board, and it may also solve for testcases for which other solvers cannot solve in time (1 hour time limit).
+The Sokoban puzzle, a P-Space Complete problem, can be formally encoded and represented as a Bounded Model Checking (BMC) problem and solved using a SAT solver. This work implements a SAT-based Sokoban Solver while exploring multiple means to reduce variable/clause count, heuristics. In comparison to other simulation-based solvers (IDA\*, MCTS, etc.), this solver can find the shortest sequence of movements required to complete the puzzle. It also supports finding optimal solution for multi-agent on board, and it may also solve for testcases for which other solvers cannot solve in time (1 hour time limit).  
 Microban test set is used as testcases, located in folder /filled.
 
 ## Installation
@@ -41,6 +41,11 @@ for example:
 sokoban filled/microban_1.txt 1 1
 ```
 
-### Runtypes
+## Runtypes
 
 1 for BMC only, 2 for BMC with binary search
+
+## Scripts
+
+You can execute run.sh to get solved status report from microban_1 to microban_50.  
+Data will be stored in "table.txt", as well as a log file "log.txt".
