@@ -15,4 +15,5 @@ src/ext-lsv/sokoban.d src/ext-lsv/sokoban.o: src/ext-lsv/sokoban.cpp src/base/ab
   src/sat/bsat/satClause.h src/misc/util/utilDouble.h src/aig/ioa/ioa.h \
   src/bdd/extrab/extraBdd.h src/bdd/cudd/cuddInt.h src/bdd/cudd/cudd.h \
   src/bdd/mtr/mtr.h src/bdd/epd/epd.h src/sat/cnf/cnf.h \
-  src/opt/dar/darInt.h src/ext-lsv/SokobanSolver.h
+  src/opt/dar/darInt.h src/ext-lsv/SokobanSolver.h \
+  src/ext-lsv/Preprocessor.h

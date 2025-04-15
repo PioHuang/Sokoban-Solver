@@ -17,6 +17,7 @@ using namespace std;
 #include "algorithm"
 #include "sat/cnf/cnf.h"
 #include "stdint.h"
+#include "Preprocessor.h"
 
 void SokobanSolver::CnfWriter(sat_solver *pSat)
 {
@@ -100,82 +101,14 @@ void Clause::AddLit(const Lit &p)
 {
     this->clause.push_back(p);
 }
-SokobanSolver::SokobanSolver()
+SokobanSolver::SokobanSolver(const Preprocessor &preprocessor) : preprocessor(preprocessor)
 {
-    mapInfo["Players"] = {};
-    mapInfo["Walls"] = {};
-    mapInfo["Boxes"] = {};
-    mapInfo["Targets"] = {};
-    mapInfo["Walkable"] = {};
+    this->mapInfo = preprocessor.get_mapInfo();
+    this->boxNum = preprocessor.boxNum;
+    this->playerNum = preprocessor.playerNum;
+    this->mapSize = preprocessor.mapSize;
     this->LitIndex = 1;
 };
-void SokobanSolver::loadMap(const string &filename)
-{
-    // define input format
-    const char playerSymbol = '@';
-    const char wallSymbol = '#';
-    const char boxSymbol = '$';
-    const char targetSymbol = '.';
-    const char walkableSymbol = ' ';
-    const char box_on_targetSymbol = '*';
-    const char player_on_targetSymbol = '+';
-
-    ifstream inFile(filename);
-    if (!inFile.is_open())
-    {
-        cerr << "Error: Unable to open file " << filename << endl;
-        return;
-    }
-    string line;
-    int row = 0;
-    int column = 0;
-    while (getline(inFile, line))
-    {
-        for (int col = 0; col < line.size(); col++)
-        {
-            char c = line[col];
-            switch (c)
-            {
-            case playerSymbol:
-                mapInfo["Players"].push_back(make_pair(row, col)); // player index in map info
-                break;
-            case wallSymbol:
-                mapInfo["Walls"].push_back(make_pair(row, col));
-                break;
-            case boxSymbol:
-                mapInfo["Boxes"].push_back(make_pair(row, col)); // box index in map info
-                break;
-            case targetSymbol:
-                mapInfo["Targets"].push_back(make_pair(row, col));
-                break;
-            case box_on_targetSymbol:
-                mapInfo["Boxes"].push_back(make_pair(row, col)); // box index in map info
-                mapInfo["Targets"].push_back(make_pair(row, col));
-                break;
-            case player_on_targetSymbol:
-                mapInfo["Players"].push_back(make_pair(row, col)); // player index in map info
-                mapInfo["Targets"].push_back(make_pair(row, col));
-                break;
-            default:
-                break;
-            }
-            if (c != wallSymbol)
-                mapInfo["Walkable"].push_back(make_pair(row, col));
-            // column = line.size();
-        }
-        column = max(column, (int)line.size());
-        row++;
-    }
-    this->mapSize = make_pair(row, column);
-    this->playerNum = mapInfo["Players"].size();
-    this->boxNum = mapInfo["Boxes"].size();
-    // cout << "Map Dimension: " << mapSize.first << ", " << mapSize.second << endl;
-    // cout << "PlayerNum: " << playerNum << endl;
-    // cout << "BoxNum: " << boxNum << endl;
-    findDeadLockBoxPos();
-    if (verbose)
-        cout << "Time steps: " << stepLimit << endl;
-}
 void SokobanSolver::setStepLimit(int limit)
 {
     this->stepLimit = limit;
@@ -246,16 +179,16 @@ void SokobanSolver::PlayerMovementConstraints()
                 Clause *clause = new Clause();
                 clause->AddLit(~(AddPlayerLiteral(row, col, player, t)));
                 clause->AddLit(AddPlayerLiteral(row, col, player, t + 1));
-                if (row > 0 && notWall(row - 1, col)) // row-1 >= 0
+                if (row > 0 && preprocessor.notWall(row - 1, col)) // row-1 >= 0
                     clause->AddLit(AddPlayerLiteral(row - 1, col, player, t + 1));
                 // move down
-                if (row < mapSize.first - 1 && notWall(row + 1, col))
+                if (row < mapSize.first - 1 && preprocessor.notWall(row + 1, col))
                     clause->AddLit(AddPlayerLiteral(row + 1, col, player, t + 1));
                 // move left
-                if (col > 0 && notWall(row, col - 1))
+                if (col > 0 && preprocessor.notWall(row, col - 1))
                     clause->AddLit(AddPlayerLiteral(row, col - 1, player, t + 1));
                 // move right
-                if (col < mapSize.second - 1 && notWall(row, col + 1))
+                if (col < mapSize.second - 1 && preprocessor.notWall(row, col + 1))
                     clause->AddLit(AddPlayerLiteral(row, col + 1, player, t + 1));
                 AddClause(clause);
             }
@@ -273,13 +206,13 @@ void SokobanSolver::PlayerMovementConstraints()
                 Clause *clause = new Clause();
                 clause->AddLit(~(AddPlayerLiteral(row, col, player, t)));
                 clause->AddLit(AddPlayerLiteral(row, col, player, t - 1));
-                if (row > 0 && notWall(row - 1, col))
+                if (row > 0 && preprocessor.notWall(row - 1, col))
                     clause->AddLit(AddPlayerLiteral(row - 1, col, player, t - 1));
-                if (row < mapSize.first - 1 && notWall(row + 1, col))
+                if (row < mapSize.first - 1 && preprocessor.notWall(row + 1, col))
                     clause->AddLit(AddPlayerLiteral(row + 1, col, player, t - 1));
-                if (col > 0 && notWall(row, col - 1))
+                if (col > 0 && preprocessor.notWall(row, col - 1))
                     clause->AddLit(AddPlayerLiteral(row, col - 1, player, t - 1));
-                if (col < mapSize.second - 1 && notWall(row, col + 1))
+                if (col < mapSize.second - 1 && preprocessor.notWall(row, col + 1))
                     clause->AddLit(AddPlayerLiteral(row, col + 1, player, t - 1));
                 AddClause(clause);
             }
@@ -294,7 +227,7 @@ void SokobanSolver::BoxPushMovementConstraints()
     {
         int row = walkable_coord.first;
         int col = walkable_coord.second;
-        if (isDeadLockBoxPos(row, col))
+        if (preprocessor.isDeadLockBoxPos(row, col))
             continue;
         for (int box = 0; box < boxNum; box++)
         {
@@ -307,19 +240,19 @@ void SokobanSolver::BoxPushMovementConstraints()
                 {
                     // Ensure there are no obstacles in the push path
                     // push up
-                    if (row - 2 >= 0 && notWall(row - 1, col) && !isDeadLockBoxPos(row - 1, col) && notWall(row - 2, col))
+                    if (row - 2 >= 0 && preprocessor.notWall(row - 1, col) && !preprocessor.isDeadLockBoxPos(row - 1, col) && preprocessor.notWall(row - 2, col))
                     {
                         sets_push.push_back({AddBoxLiteral(row - 1, col, box, t - 1), AddPlayerLiteral(row - 2, col, player, t - 1), AddPlayerLiteral(row - 1, col, player, t)});
                     }
-                    if (row + 2 < mapSize.first && notWall(row + 1, col) && !isDeadLockBoxPos(row + 1, col) && notWall(row + 2, col))
+                    if (row + 2 < mapSize.first && preprocessor.notWall(row + 1, col) && !preprocessor.isDeadLockBoxPos(row + 1, col) && preprocessor.notWall(row + 2, col))
                     {
                         sets_push.push_back({AddBoxLiteral(row + 1, col, box, t - 1), AddPlayerLiteral(row + 2, col, player, t - 1), AddPlayerLiteral(row + 1, col, player, t)});
                     }
-                    if (col + 2 < mapSize.second && notWall(row, col + 1) && !isDeadLockBoxPos(row, col + 1) && notWall(row, col + 2))
+                    if (col + 2 < mapSize.second && preprocessor.notWall(row, col + 1) && !preprocessor.isDeadLockBoxPos(row, col + 1) && preprocessor.notWall(row, col + 2))
                     {
                         sets_push.push_back({AddBoxLiteral(row, col + 1, box, t - 1), AddPlayerLiteral(row, col + 2, player, t - 1), AddPlayerLiteral(row, col + 1, player, t)});
                     }
-                    if (col - 2 >= 0 && notWall(row, col - 1) && !isDeadLockBoxPos(row, col - 1) && notWall(row, col - 2))
+                    if (col - 2 >= 0 && preprocessor.notWall(row, col - 1) && !preprocessor.isDeadLockBoxPos(row, col - 1) && preprocessor.notWall(row, col - 2))
                     {
                         sets_push.push_back({AddBoxLiteral(row, col - 1, box, t - 1), AddPlayerLiteral(row, col - 2, player, t - 1), AddPlayerLiteral(row, col - 1, player, t)});
                     }
@@ -354,7 +287,7 @@ void SokobanSolver::DebugConstraints()
     {
         int row = walkable_coord.first;
         int col = walkable_coord.second;
-        if (isDeadLockBoxPos(row, col))
+        if (preprocessor.isDeadLockBoxPos(row, col))
             continue;
         for (int box = 0; box < boxNum; box++)
         {
@@ -368,7 +301,7 @@ void SokobanSolver::DebugConstraints()
                 {
                     int row_dir = dir_pair.first;
                     int col_dir = dir_pair.second;
-                    if (row + row_dir >= 0 && row + row_dir < mapSize.first && col + col_dir >= 0 && col + col_dir < mapSize.second && !isDeadLockBoxPos(row + row_dir, col + col_dir) && notWall(row + row_dir, col + col_dir))
+                    if (row + row_dir >= 0 && row + row_dir < mapSize.first && col + col_dir >= 0 && col + col_dir < mapSize.second && !preprocessor.isDeadLockBoxPos(row + row_dir, col + col_dir) && preprocessor.notWall(row + row_dir, col + col_dir))
                         newClause->AddLit(AddBoxLiteral(row + row_dir, col + col_dir, box, t - 1));
                 }
                 // cout << "Adding Debug Constraint for Box " << box << " at (" << row << ", " << col << ") at time " << t << endl;
@@ -418,7 +351,7 @@ void SokobanSolver::BoxSinglePlacementConstraints()
     {
         int row = walkable_coord.first;
         int col = walkable_coord.second;
-        if (isDeadLockBoxPos(row, col))
+        if (preprocessor.isDeadLockBoxPos(row, col))
             continue;
         validPositions.push_back({row, col});
     }
@@ -453,7 +386,7 @@ void SokobanSolver::BoxCollisionConstraints() // should be on different position
             {
                 int row = walkable_coord.first;
                 int col = walkable_coord.second;
-                if (isDeadLockBoxPos(row, col))
+                if (preprocessor.isDeadLockBoxPos(row, col))
                     continue;
                 for (int t = 1; t <= stepLimit; t++)
                 {
@@ -478,7 +411,7 @@ void SokobanSolver::BoxAndPlayerCollisionConstraints()
             {
                 int row = walkable_coord.first;
                 int col = walkable_coord.second;
-                if (isDeadLockBoxPos(row, col))
+                if (preprocessor.isDeadLockBoxPos(row, col))
                     continue;
                 for (int t = 1; t <= stepLimit; t++)
                 {
@@ -492,10 +425,6 @@ void SokobanSolver::BoxAndPlayerCollisionConstraints()
     }
 }
 
-/*
-This part is for Multi-Agent
-Sokoban Puzzle Solving.
-*/
 void SokobanSolver::PlayerCollisionConstraints()
 {
     // cout << "Adding player collision constraints..." << endl;
@@ -532,7 +461,7 @@ void SokobanSolver::PlayerHeadOnConstraints() // vertical
                 for (int t = 1; t < stepLimit; t++)
                 {
                     // consider boundary conditions
-                    if (notWall(row, col + 1))
+                    if (preprocessor.notWall(row, col + 1))
                     {
                         Clause *newClause1 = new Clause;
                         newClause1->AddLit(~(AddPlayerLiteral(row, col, player1, t)));
@@ -562,7 +491,7 @@ void SokobanSolver::PlayerHeadOnConstraints() // vertical
                 int col = walkable_coord.second;
                 for (int t = 1; t < stepLimit; t++)
                 {
-                    if (notWall(row + 1, col))
+                    if (preprocessor.notWall(row + 1, col))
                     {
                         // consider boundary conditions
                         Clause *newClause1 = new Clause;
@@ -584,11 +513,6 @@ void SokobanSolver::PlayerHeadOnConstraints() // vertical
         }
     }
 }
-/*
-Multi-Agent
-Sokoban Solving
-*/
-
 void SokobanSolver::InitState()
 {
     // cout << "Adding initial state..." << endl;
@@ -606,7 +530,7 @@ void SokobanSolver::InitState()
         {
             for (int col = 0; col < mapSize.second; col++)
             {
-                if (!(row == playerPos_row && col == playerPos_col) && notWall(row, col))
+                if (!(row == playerPos_row && col == playerPos_col) && preprocessor.notWall(row, col))
                 {
                     Clause *NotPlayerClause = new Clause();
                     NotPlayerClause->AddLit(~(AddPlayerLiteral(row, col, player, 0)));
@@ -627,9 +551,9 @@ void SokobanSolver::InitState()
         {
             for (int col = 0; col < mapSize.second; col++)
             {
-                if (isDeadLockBoxPos(row, col))
+                if (preprocessor.isDeadLockBoxPos(row, col))
                     continue;
-                if (!(row == boxPos_row && col == boxPos_col) && (notWall(row, col)))
+                if (!(row == boxPos_row && col == boxPos_col) && (preprocessor.notWall(row, col)))
                 {
                     Clause *NotBoxClause = new Clause();
                     NotBoxClause->AddLit(~(AddBoxLiteral(row, col, box, 0)));
@@ -653,128 +577,6 @@ void SokobanSolver::SolvedState()
         AddClause(newClause);
     }
 }
-/*///////////////////////////////////
-Experimental Constraints
-*/
-///////////////////////////////////
-void SokobanSolver::LearntConstraints() // slows down the process!
-{
-    vector<set<Lit>> learnt_set;
-    // try previous step
-    for (const auto &target : mapInfo["Targets"])
-    {
-        set<Lit> tmp = {};
-        for (int box = 0; box < boxNum; box++)
-            tmp.insert(AddBoxLiteral(target.first, target.second, box, stepLimit - 1)); // last step limit
-        learnt_set.push_back(tmp);
-    }
-    vector<vector<Lit>> Cartesian_learnt = cartesianProduct(learnt_set);
-    for (const auto &set : Cartesian_learnt)
-    {
-        if (!set.empty())
-        {
-            Clause *newClause = new Clause;
-            for (const auto &lit : set)
-                newClause->AddLit(~lit);
-            AddClause(newClause);
-        }
-    }
-}
-
-void SokobanSolver::bfs(vector<vector<char>> &underlyingTiles, vector<vector<bool>> &visited, vector<pair<int, int>> &group, int i, int j)
-{
-    visited[i][j] = true;
-    group.push_back(make_pair(i, j));
-
-    // up (need the down tile to be empty)
-    if (i > 0 && !isWall(i - 1, j) && !visited[i - 1][j] && !isWall(i + 1, j))
-    {
-        bfs(underlyingTiles, visited, group, i - 1, j);
-    }
-    // down (need the up tile to be empty)
-    if (i < mapSize.first - 1 && !isWall(i + 1, j) && !visited[i + 1][j] && !isWall(i - 1, j))
-    {
-        bfs(underlyingTiles, visited, group, i + 1, j);
-    }
-    // left (need the right tile to be empty)
-    if (j > 0 && !isWall(i, j - 1) && !visited[i][j - 1] && !isWall(i, j + 1))
-    {
-        bfs(underlyingTiles, visited, group, i, j - 1);
-    }
-    // right (need the left tile to be empty)
-    if (j < mapSize.second - 1 && !isWall(i, j + 1) && !visited[i][j + 1] && !isWall(i, j - 1))
-    {
-        bfs(underlyingTiles, visited, group, i, j + 1);
-    }
-    return;
-}
-
-void SokobanSolver::findDeadLockBoxPos()
-{
-    vector<vector<char>> underlyingTiles(mapSize.first, vector<char>(mapSize.second, ' '));
-    for (int i = 0; i < mapSize.first; i++)
-    {
-        for (int j = 0; j < mapSize.second; j++)
-        {
-            if (isWall(i, j))
-                underlyingTiles[i][j] = 'W';
-            if (isTarget(i, j))
-                underlyingTiles[i][j] = 'T';
-        }
-    }
-    int deadGroupCount = 0;
-    deadLockBoxPos.clear();
-    // BFS to find all the dead lock box positions
-    for (int i = 0; i < mapSize.first; i++)
-    {
-        for (int j = 0; j < mapSize.second; j++)
-        {
-            if (underlyingTiles[i][j] != ' ')
-                continue;
-            // BFS
-            vector<vector<bool>> visited(mapSize.first, vector<bool>(mapSize.second, false));
-            vector<pair<int, int>> group;
-            group.push_back(make_pair(i, j));
-            bfs(underlyingTiles, visited, group, i, j);
-
-            // if there is a target in the group, then it is not a dead lock
-            bool isDeadLock = true;
-            for (auto pos : group)
-            {
-                if (underlyingTiles[pos.first][pos.second] == 'T')
-                {
-                    isDeadLock = false;
-                    break;
-                }
-            }
-            if (isDeadLock)
-            {
-                for (auto pos : group)
-                {
-                    if (underlyingTiles[pos.first][pos.second] == ' ')
-                    {
-                        underlyingTiles[pos.first][pos.second] = char(deadGroupCount + '0');
-                        deadLockBoxPos.push_back(pos);
-                    }
-                }
-                deadGroupCount++;
-            }
-        }
-    }
-
-    if (verbose)
-        cout << "Num of dead lock box positions: " << deadLockBoxPos.size() << endl;
-    vector<vector<char>> deadLockBoxPosStr(mapSize.first, vector<char>(mapSize.second, ' '));
-    // deadLockBoxPosMap
-    deadLockBoxPosMap = vector<vector<bool>>(mapSize.first, vector<bool>(mapSize.second, false));
-    for (const auto &d : deadLockBoxPos)
-    {
-        int i = d.first;
-        int j = d.second;
-        deadLockBoxPosMap[i][j] = true;
-    }
-}
-
 void SokobanSolver::ExistenceConstraints()
 {
     // cout << "Adding existence constraints..." << endl;
@@ -787,7 +589,7 @@ void SokobanSolver::ExistenceConstraints()
             {
                 int row = walkable_coord.first;
                 int col = walkable_coord.second;
-                if (isDeadLockBoxPos(row, col))
+                if (preprocessor.isDeadLockBoxPos(row, col))
                     continue;
                 newClause->AddLit(AddBoxLiteral(row, col, box, t));
             }
@@ -795,137 +597,10 @@ void SokobanSolver::ExistenceConstraints()
         }
     }
 }
-
-bool SokobanSolver::helper(vector<vector<int>> &tunnel_map, vector<vector<bool>> &visited, int row, int col, int index, int type, vector<pair<int, int>> &t)
-{ // dfs for tunnels
-    visited[row][col] = true;
-    // base case
-    if (type == 0) // horizontal
-    {
-        if (isWall(row, col + 1) && isWall(row + 1, col) && isWall(row - 1, col))
-            return false;
-        if ((notWall(row - 1, col) || notWall(row + 1, col)))
-        {
-            if (index >= 2)
-            {
-                t.push_back({row, col - 1});
-                return true;
-            }
-            else
-                return false;
-            ;
-        }
-        return helper(tunnel_map, visited, row, col + 1, index + 1, 0, t);
-    }
-    else
-    { // vertical
-        if (isWall(row + 1, col) && isWall(row, col + 1) && isWall(row, col - 1))
-            return false;
-        if (notWall(row, col + 1) || notWall(row, col - 1))
-        {
-            if (index >= 2)
-            {
-                t.push_back({row - 1, col});
-                return true;
-            }
-            else
-                return false;
-        }
-        return helper(tunnel_map, visited, row + 1, col, index + 1, 1, t);
-    }
-    tunnel_map[row][col] = index + 1;
-}
-void SokobanSolver::TunnelIdentifying()
-{
-    // find tunnel in the map
-    // create constraints for B in tunnel and P at the right place
-    // Find tunnels in the map
-    vector<vector<bool>> visited(mapSize.first, vector<bool>(mapSize.second, false));
-    vector<vector<int>> tunnel_map(mapSize.first, vector<int>(mapSize.second, 0));
-
-    for (int row = 1; row < mapSize.first - 1; row++)
-    {
-        for (int col = 1; col < mapSize.second - 1; col++)
-        {
-            if (!isWalkable(row, col) || visited[row][col])
-                continue;
-            visited[row][col] = true;
-            // Check for horizontal tunnel
-            if (isWall(row - 1, col) && isWall(row + 1, col))
-            {
-                vector<pair<int, int>> t;
-                // Check if left and right are walkable
-                bool left_deadend = false;
-                if (!isWalkable(row, col - 1))
-                    left_deadend = true;
-                if (col > 0 && col < mapSize.second && isWalkable(row, col + 1))
-                {
-                    tunnel_map[row][col] = 1; // tunnel entry
-                    if (helper(tunnel_map, visited, row, col + 1, 1, 0, t))
-                        t.push_back({row, col});
-                }
-                if (t.size() != 0 && !left_deadend)
-                    tunnels.insert(t);
-            }
-            // Check for vertical tunnel
-            if (isWall(row, col - 1) && isWall(row, col + 1))
-            {
-                vector<pair<int, int>> t;
-                // Check if up and down are walkable
-                bool top_deadend = false;
-                if (!isWalkable(row - 1, col))
-                    top_deadend = true;
-                if ((row > 0 && isWalkable(row - 1, col)) &&
-                    (row < mapSize.first && isWalkable(row + 1, col)))
-                {
-                    tunnel_map[row][col] = 1; // tunnel entry
-                    if (helper(tunnel_map, visited, row + 1, col, 1, 1, t))
-                        t.push_back({row, col});
-                }
-                if (t.size() != 0 && !top_deadend)
-                    tunnels.insert(t);
-            }
-        }
-    }
-    // Debug output
-    if (verbose)
-    {
-        cout << "Identified Tunnels:" << endl;
-        for (const auto &tunnel : tunnels)
-        {
-            cout << "Tunnel: ";
-            for (const auto &pos : tunnel)
-            {
-                cout << "(" << pos.first << ", " << pos.second << ") ";
-            }
-            cout << endl;
-        }
-        for (int i = 0; i < mapSize.first; i++)
-        {
-            for (int j = 0; j < mapSize.second; j++)
-            {
-                if (isWall(i, j))
-                    cout << "W";
-                else if (tunnel_map[i][j] != ' ')
-                    cout << tunnel_map[i][j];
-                else
-                    cout << " ";
-            }
-            cout << endl;
-        }
-    }
-}
 void SokobanSolver::tunnelMacro()
 {
     // player only
-    cout << "Size of tunnels: " << tunnels.size() << endl;
-
-    if (tunnels.empty())
-    {
-        cout << "ah ha i am empty" << endl;
-        return;
-    }
-    for (const auto &tunnel : tunnels)
+    for (const auto &tunnel : preprocessor.tunnels)
     {
         // if player enters the tunnel, move through it
         //  P(row, col-1, p, t-1) ^ P(row, col, p, t) -> P(row, col+1, p, t+1)
@@ -985,7 +660,7 @@ void SokobanSolver::AllConstraints()
 {
     InitState();
     SolvedState();
-    TunnelIdentifying();
+    // TunnelIdentifying();
     PlayerMovementConstraints();
     BoxPushMovementConstraints();
     // PlayerHeadOnConstraints(); // MA
@@ -997,7 +672,4 @@ void SokobanSolver::AllConstraints()
     ExistenceConstraints();
     DebugConstraints();
     tunnelMacro();
-
-    // ObstacleConstraints();
-    // LearntConstraints();
 }

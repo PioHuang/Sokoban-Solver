@@ -13,6 +13,7 @@ using namespace std;
 #include "algorithm"
 #include "sat/cnf/cnf.h"
 #include "stdint.h"
+#include "Preprocessor.h"
 
 class Lit
 {
@@ -47,13 +48,6 @@ inline Lit operator~(const Lit &p)
     q.x = q.x * (-1); // 34 -> -34
     return q;
 }
-class Clause
-{
-public:
-    void AddLit(const Lit &p);
-    vector<Lit> clause;
-};
-// user defined hash function is necessary
 class LitHash
 {
 public:
@@ -61,13 +55,23 @@ public:
     size_t operator()(const Lit &lit) const { return lit.x; }
 };
 
+class Clause
+{
+public:
+    void AddLit(const Lit &p);
+    vector<Lit> clause;
+};
+// user defined hash function is necessary
+
 class SokobanSolver
 {
 public:
-    SokobanSolver();
+    SokobanSolver(const Preprocessor &preprocessor);
     void setStepLimit(int limit);
-    void loadMap(const string &fileName);
-    // Constraints
+
+    /*
+    ============ Constraints ============
+    */
     void PlayerMovementConstraints();        // 1
     void BoxPushMovementConstraints();       // 2
     void PlayerHeadOnConstraints();          // 3
@@ -79,72 +83,34 @@ public:
     void ExistenceConstraints();             // 9
     void ObstacleConstraints();              // 10
     void DebugConstraints();                 // 11
-
-    // experimental constraints
-    void LearntConstraints();
-    void TunnelIdentifying();
-    set<vector<pair<int, int>>> tunnels = {};
-    void tunnelMacro(); // 12
-
-    bool helper(vector<vector<int>> &tunnel_map, vector<vector<bool>> &visited, int row, int col, int index, int type, vector<pair<int, int>> &q);
-    inline bool notWall(int row, int col)
-    {
-        return find(mapInfo["Walls"].begin(), mapInfo["Walls"].end(), make_pair(row, col)) == mapInfo["Walls"].end();
-    }
-    inline bool isWall(int row, int col)
-    {
-        return find(mapInfo["Walls"].begin(), mapInfo["Walls"].end(), make_pair(row, col)) != mapInfo["Walls"].end();
-    }
-    inline bool isWalkable(int row, int col)
-    {
-        return find(mapInfo["Walkable"].begin(), mapInfo["Walkable"].end(), make_pair(row, col)) != mapInfo["Walkable"].end();
-    }
-    inline bool isTarget(int row, int col)
-    {
-        return mapInfo["Targets"].end() != find(mapInfo["Targets"].begin(), mapInfo["Targets"].end(), make_pair(row, col));
-    }
-    // heuristic
-    void findDeadLockBoxPos();
-    vector<pair<int, int>> deadLockBoxPos;
-    vector<vector<bool>> deadLockBoxPosMap;
-
-    inline bool isDeadLockBoxPos(int row, int col)
-    {
-        return deadLockBoxPosMap[row][col];
-    }
-    void bfs(vector<vector<char>> &underlyingTiles, vector<vector<bool>> &visited, vector<pair<int, int>> &group, int i, int j);
-
-    // Initial State
-    void InitState();
-    // Solved State
-    void SolvedState();
-
-    void AddClause(Clause *newClause);
-    Lit AddPlayerLiteral(int row, int col, int player, int time);
-    Lit AddBoxLiteral(int row, int col, int box, int time);
-
+    void tunnelMacro();                      // 12
+    void InitState();                        // 13
+    void SolvedState();                      // 14
     void AllConstraints();
 
-    void CnfWriter(sat_solver *pSat);
-
-    string createKey(int x, int y, int player, int time)
-    {
-        return to_string(x) + "_" + to_string(y) + "_" + to_string(player) + "_" + to_string(time);
-    }
-
-    void debugger(const string &fileName);
-
-    pair<int, int> get_mapSize() { return mapSize; }
+    /*
+    ============ Literals ============
+    */
+    Lit AddPlayerLiteral(int row, int col, int player, int time);
+    Lit AddBoxLiteral(int row, int col, int box, int time);
+    string createKey(int x, int y, int player, int time) { return to_string(x) + "_" + to_string(y) + "_" + to_string(player) + "_" + to_string(time); }
     Lit &get_LitDictionary(int index) { return LitDictionary[index]; }
-
     unordered_map<int, Lit> get_LitDictionary() { return LitDictionary; }
-    unordered_map<string, vector<pair<int, int>>> &
-    get_mapInfo() { return mapInfo; }
+    /*
+    ============ Clauses ============
+    */
+    void CnfWriter(sat_solver *pSat);
+    void AddClause(Clause *newClause);
 
-    int verbose;
+    /*
+    ============ Debugging tool ============
+    */
+    bool verbose;
+    void debugger(const string &fileName);
 
 private:
     string mapName;
+    Preprocessor preprocessor;
     int stepLimit;
     int LitIndex;                                          // initialize as 1
     unordered_map<string, vector<pair<int, int>>> mapInfo; // player, wall, block, target coordinate pairs
