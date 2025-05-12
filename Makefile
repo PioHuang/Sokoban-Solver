@@ -64,7 +64,7 @@ endif
 
 # compile ABC using the C++ compiler and put everything in the namespace $(ABC_NAMESPACE)
 ifdef ABC_USE_NAMESPACE
-  CFLAGS += -DABC_NAMESPACE=$(ABC_USE_NAMESPACE) -fpermissive -x c++
+  CFLAGS += -DABC_NAMESPACE=$(ABC_USE_NAMESPACE) -fpermissive
   CC := $(CXX)
   $(info $(MSG_PREFIX)Compiling in namespace $(ABC_NAMESPACE))
 endif
