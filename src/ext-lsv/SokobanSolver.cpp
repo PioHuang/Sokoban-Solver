@@ -787,12 +787,10 @@ void SokobanSolver::PullStageTarget()
             AddClause(newClause);
         }
     }
-
-    for (const auto &[row, col] : preprocessor.pullable_set)
+    for (int box = 0; box < boxNum; box++)
     {
-        cout << "Adding pull stage target constraints for " << row << " " << col << endl;
         Clause *newClause = new Clause();
-        for (int box = 0; box < boxNum; box++)
+        for (const auto &[row, col] : preprocessor.pullable_set)
             newClause->AddLit(AddBoxLiteral(row, col, box, stepLimit));
         AddClause(newClause);
     }
