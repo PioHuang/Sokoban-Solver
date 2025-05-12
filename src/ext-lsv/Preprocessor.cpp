@@ -4,6 +4,7 @@
 #include <queue>
 #include <algorithm>
 #include <map>
+using namespace std;
 Preprocessor::Preprocessor(const string &filename, bool verbose) : filename(filename), verbose(verbose) {}
 
 void Preprocessor::loadMap()
