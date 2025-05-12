@@ -8,6 +8,9 @@
 #include <queue>
 #include <map>
 
+#include <string>
+#include <algorithm>
+
 using namespace std;
 
 class Preprocessor
