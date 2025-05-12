@@ -88,6 +88,11 @@ public:
     void SolvedState();                      // 14
     void AllConstraints();
 
+    //========== Pulling =============
+    void PlayerPullConstraints(); // 15
+    void InitState_PulledFromTargets();
+    void PullOnlyConstraints();
+    void PullStageTarget(); // requires all boxes NOT on target
     /*
     ============ Literals ============
     */
@@ -109,6 +114,7 @@ public:
     void debugger(const string &fileName);
 
 private:
+    vector<pair<int, int>> goodPlayerStarts;
     string mapName;
     Preprocessor preprocessor;
     int stepLimit;

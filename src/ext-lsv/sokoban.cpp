@@ -19,6 +19,7 @@
 #include <iomanip>
 using namespace std;
 
+void visualizeSolution(Preprocessor &preprocessor, SokobanSolver &Solver, sat_solver *pSat, int step, bool verbose);
 static int Sokoban_CommandSolve(Abc_Frame_t *pAbc, int argc, char **argv); // command function
 
 void init(Abc_Frame_t *pAbc)
@@ -111,19 +112,6 @@ int Sokoban_CommandSolve(Abc_Frame_t *pAbc, int argc, char **argv)
             Solver.AllConstraints();
             Solver.CnfWriter(pSat);
 
-            // separate the constraints
-            // increment steps, reuse previous clauses
-
-            // Solver.debugger("Debug.txt");
-            // cout << "Finished" << endl;
-
-            // color code
-            string black = "30";
-            string red = "31";
-            string green = "32"; // box color
-            string yellow = "33";
-            string blue = "34";
-
             int status = sat_solver_solve(pSat, nullptr, nullptr, 0, 0, 0, 0);
             if (status == l_True)
             {
@@ -142,66 +130,7 @@ int Sokoban_CommandSolve(Abc_Frame_t *pAbc, int argc, char **argv)
                 {
                     return 0;
                 }
-                unordered_map<int, Lit> LitDictionary = Solver.get_LitDictionary();
-                for (int index = 0; index < LitDictionary.size(); index++)
-                {
-                    int value = sat_solver_var_value(pSat, LitDictionary[index].x);
-                    if (value > 0)
-                        true_literals.push_back(LitDictionary[index].x);
-                }
-
-                cout << "Steps in action: " << endl;
-                for (int t = 0; t <= step; t++)
-                {
-                    vector<vector<char>> visual(preprocessor.get_mapSize().first, vector<char>(preprocessor.get_mapSize().second, 'X'));
-                    for (const auto &wall_coord : preprocessor.get_mapInfo().at("Walls"))
-                        visual[wall_coord.first][wall_coord.second] = 'W';
-                    for (const auto &target_coord : preprocessor.get_mapInfo().at("Targets"))
-                        visual[target_coord.first][target_coord.second] = 'T';
-                    for (auto val : true_literals)
-                    {
-                        Lit &lit = Solver.get_LitDictionary(val);
-                        if (lit.get_t() == t)
-                        {
-                            if (lit.get_identity() == 1)
-                                visual[lit.get_x()][lit.get_y()] = 'P';
-                            else
-                                visual[lit.get_x()][lit.get_y()] = 'B';
-                        }
-                    }
-                    // print
-                    for (int row = 0; row < preprocessor.get_mapSize().first; row++)
-                    {
-                        for (int col = 0; col < preprocessor.get_mapSize().second; col++)
-                        {
-                            switch (visual[row][col])
-                            {
-                            case 'B':
-                                cout << "\033[" << green << "m" << visual[row][col] << "\033[0m" << " ";
-                                break;
-                            case 'P':
-                                cout << visual[row][col] << " ";
-                                break;
-                            case 'T':
-                                cout << "\033[" << red << "m" << visual[row][col] << "\033[0m" << " ";
-                                break;
-                            case 'W':
-                                cout << "\033[" << yellow << "m" << visual[row][col] << "\033[0m" << " ";
-                                break;
-                            default:
-                                cout << "\033[" << black << "m" << visual[row][col] << "\033[0m" << " ";
-                                break;
-                            }
-                        }
-                        cout << endl;
-                    }
-                    if (t < step)
-                    {
-                        cout.flush();
-                        this_thread::sleep_for(chrono::seconds(1));
-                        cout << "\033[" << preprocessor.get_mapSize().first << "A";
-                    }
-                }
+                visualizeSolution(preprocessor, Solver, pSat, step, verbose);
                 return 0;
             }
             sat_solver_delete(pSat);
@@ -245,7 +174,7 @@ int Sokoban_CommandSolve(Abc_Frame_t *pAbc, int argc, char **argv)
         }
 
         // Perform binary search to find the minimum step
-        int low = step - (step <= 30 ? 10 : 8);
+        int low = max(1, step - (step <= 30 ? 10 : 8));
         int high = foundStep;
 
         while (low < high)
@@ -261,14 +190,9 @@ int Sokoban_CommandSolve(Abc_Frame_t *pAbc, int argc, char **argv)
             int status = sat_solver_solve(pSat, nullptr, nullptr, 0, 0, 0, 0);
 
             if (status == l_True)
-            {
                 high = mid; // Narrow down to smaller step range
-            }
             else
-            {
                 low = mid + 1; // Increase the lower bound
-            }
-
             sat_solver_delete(pSat);
         }
         auto stop = high_resolution_clock::now();
@@ -277,5 +201,257 @@ int Sokoban_CommandSolve(Abc_Frame_t *pAbc, int argc, char **argv)
         cout << "Solution found at: " << low << " steps" << endl;
         cout << "BMC search duration: " << duration.count() << " seconds" << endl;
     }
-    return 0;
+    else if (runType == 3) // binary search with pull only constraints
+    {
+        using namespace std::chrono;
+        auto start = high_resolution_clock::now();
+
+        Preprocessor preprocessor(map, verbose);
+        preprocessor.loadMap();
+        preprocessor.TunnelIdentifying();
+        preprocessor.findDeadlockPos();
+        preprocessor.findPullRegions();
+        int step = 100;
+        int increment = 10;
+        int foundStep = -1;
+
+        while (true)
+        {
+            SokobanSolver Solver(preprocessor);
+            cout << "step: " << step << endl;
+            Solver.setStepLimit(step);
+            sat_solver *pSat = sat_solver_new();
+            Solver.PullOnlyConstraints();
+            Solver.CnfWriter(pSat);
+
+            int status = sat_solver_solve(pSat, nullptr, nullptr, 0, 0, 0, 0);
+
+            if (status == l_True)
+            {
+                foundStep = step;
+                visualizeSolution(preprocessor, Solver, pSat, foundStep, verbose);
+                break;
+            }
+
+            sat_solver_delete(pSat);
+
+            if (step < 5)
+                step += 1;
+            else if (step < 10)
+                step += 5;
+            else if (step < 30)
+                step += 10; // Increment by 10 initially
+            else
+                step += 8; //  Increment by 8 after reaching step 30
+        }
+
+        // Perform binary search to find the minimum step
+        /*int low = max(1, step - (step <= 30 ? 10 : 8));
+        int high = foundStep;
+
+        while (low < high)
+        {
+            int mid = low + (high - low) / 2;
+
+            SokobanSolver Solver(preprocessor);
+            Solver.setStepLimit(mid);
+            sat_solver *pSat = sat_solver_new();
+            Solver.PullOnlyConstraints();
+            Solver.CnfWriter(pSat);
+
+            int status = sat_solver_solve(pSat, nullptr, nullptr, 0, 0, 0, 0);
+
+            if (status == l_True)
+                high = mid; // Narrow down to smaller step range
+            else
+                low = mid + 1; // Increase the lower bound
+
+            sat_solver_delete(pSat);
+        }*/
+
+        auto stop = high_resolution_clock::now();
+        auto duration = duration_cast<seconds>(stop - start);
+
+        cout << "Solution found at: " << foundStep << " steps" << endl;
+        cout << "BMC search duration: " << duration.count() << " seconds" << endl;
+    }
+    else if (runType == 4) // regular BMC with pull only constraints
+    {
+        using namespace std::chrono;
+        auto start = high_resolution_clock::now();
+        Preprocessor preprocessor(map, verbose);
+        preprocessor.loadMap();
+        preprocessor.TunnelIdentifying();
+        preprocessor.findDeadlockPos();
+        preprocessor.findPullRegions();
+        int step = 1;
+        while (true)
+        {
+            auto curr_time = high_resolution_clock::now();
+            auto TLE = hours(1);
+            if (duration_cast<seconds>(curr_time - start) >= TLE)
+            {
+                cout << "Timeout: 1 hour" << endl;
+                WriteResultsToTable(map, true);
+                return 0;
+            }
+            SokobanSolver Solver(preprocessor);
+            Solver.setStepLimit(step);
+            Solver.verbose = verbose;
+            sat_solver *pSat = sat_solver_new();
+            Solver.PullOnlyConstraints();
+            Solver.CnfWriter(pSat);
+
+            int status = sat_solver_solve(pSat, nullptr, nullptr, 0, 0, 0, 0);
+            if (status == l_True)
+            {
+                vector<int> true_literals;
+                auto stop = high_resolution_clock::now();
+                auto duration = duration_cast<microseconds>(stop - start);
+                cout << "Solution found at: " << step << " steps" << endl;
+                double duration_seconds = duration.count() / 1e6; // Convert microseconds to seconds
+
+                // Round to three decimal places
+                duration_seconds = round(duration_seconds * 1000) / 1000.0;
+                cout << "BMC search duration: " << duration_seconds << " seconds" << endl;
+                WriteResultsToTable(map, false, duration_seconds, step);
+
+                if (!verbose)
+                {
+                    return 0;
+                }
+                visualizeSolution(preprocessor, Solver, pSat, step, verbose);
+                return 0;
+            }
+            sat_solver_delete(pSat);
+            step++;
+        }
+    }
+    else if (runType == 5) // regular BMC with pull only constraints
+    {
+        using namespace std::chrono;
+        auto start = high_resolution_clock::now();
+        Preprocessor preprocessor(map, verbose);
+        preprocessor.loadMap();
+        preprocessor.TunnelIdentifying();
+        preprocessor.findDeadlockPos();
+        int step = 1;
+        int foundStep = -1;
+
+        while (true)
+        {
+            SokobanSolver Solver(preprocessor);
+            Solver.setStepLimit(step);
+            sat_solver *pSat = sat_solver_new();
+            Solver.PullOnlyConstraints();
+            Solver.CnfWriter(pSat);
+
+            int status = sat_solver_solve(pSat, nullptr, nullptr, 0, 0, 0, 0);
+
+            if (status == l_True)
+            {
+                auto stop = high_resolution_clock::now();
+                auto duration = duration_cast<seconds>(stop - start);
+                foundStep = step;
+                cout << "Solution found at: " << foundStep << " steps" << endl;
+                cout << "BMC search duration: " << duration.count() << " seconds" << endl;
+                visualizeSolution(preprocessor, Solver, pSat, foundStep, verbose);
+                break;
+            }
+
+            sat_solver_delete(pSat);
+
+            if (step < 20)
+                step += 8; // Increment by 10 initially
+            else
+                step += 4; //  Increment by 8 after reaching step 30
+        }
+    }
+}
+
+void visualizeSolution(Preprocessor &preprocessor, SokobanSolver &Solver, sat_solver *pSat, int step, bool verbose)
+{
+    if (!verbose)
+        return;
+
+    // Get true literals from SAT solver
+    vector<int> true_literals;
+    const auto &litDict = Solver.get_LitDictionary();
+    for (const auto &[index, lit] : litDict)
+    {
+        if (sat_solver_var_value(pSat, lit.x) > 0)
+        {
+            true_literals.push_back(lit.x);
+        }
+    }
+
+    // ANSI color codes
+    const struct
+    {
+        string black = "30";
+        string red = "31";
+        string green = "32";
+        string yellow = "33";
+        string blue = "34";
+    } colors;
+
+    cout << "Steps in action: " << endl;
+    for (int t = 0; t <= step; t++)
+    {
+        // Initialize visualization grid
+        auto visual = vector<vector<char>>(preprocessor.get_mapSize().first,
+                                           vector<char>(preprocessor.get_mapSize().second, 'X'));
+
+        // Place static elements
+        for (const auto &[row, col] : preprocessor.get_mapInfo().at("Walls"))
+            visual[row][col] = 'W';
+        for (const auto &[row, col] : preprocessor.get_mapInfo().at("Targets"))
+            visual[row][col] = 'T';
+
+        // Place dynamic elements (players and boxes)
+        for (int val : true_literals)
+        {
+            const auto &lit = Solver.get_LitDictionary(val);
+            if (lit.get_t() == t)
+            {
+                visual[lit.get_x()][lit.get_y()] = lit.get_identity() == 1 ? 'P' : 'B';
+            }
+        }
+
+        // Print the grid with colors
+        for (const auto &row : visual)
+        {
+            for (char cell : row)
+            {
+                string color;
+                switch (cell)
+                {
+                case 'B':
+                    color = colors.green;
+                    break;
+                case 'P':
+                    color = colors.blue;
+                    break;
+                case 'T':
+                    color = colors.red;
+                    break;
+                case 'W':
+                    color = colors.yellow;
+                    break;
+                default:
+                    color = colors.black;
+                }
+                cout << "\033[" << color << "m" << cell << "\033[0m ";
+            }
+            cout << endl;
+        }
+
+        // Animation delay between steps
+        if (t < step)
+        {
+            cout.flush();
+            this_thread::sleep_for(chrono::seconds(1));
+            cout << "\033[" << preprocessor.get_mapSize().first << "A";
+        }
+    }
 }

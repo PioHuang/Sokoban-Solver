@@ -322,10 +322,10 @@ void SokobanSolver::PlayerSinglePlacementConstraints()
         int col = walkable_coord.second;
         validPositions.push_back({row, col});
     }
-    // Create clauses to ensure no two players occupy the same position at the same time
+
     for (int player = 0; player < playerNum; player++)
     {
-        for (int t = 1; t <= stepLimit; t++)
+        for (int t = 0; t <= stepLimit; t++)
         {
             for (size_t i = 0; i < validPositions.size(); i++)
             {
@@ -356,10 +356,9 @@ void SokobanSolver::BoxSinglePlacementConstraints()
         validPositions.push_back({row, col});
     }
 
-    // Create clauses to ensure no two players occupy the same position at the same time
     for (int box = 0; box < boxNum; box++)
     {
-        for (int t = 1; t <= stepLimit; t++)
+        for (int t = 0; t <= stepLimit; t++)
         {
             for (size_t i = 0; i < validPositions.size(); i++)
             {
@@ -388,7 +387,7 @@ void SokobanSolver::BoxCollisionConstraints() // should be on different position
                 int col = walkable_coord.second;
                 if (preprocessor.isDeadLockBoxPos(row, col))
                     continue;
-                for (int t = 1; t <= stepLimit; t++)
+                for (int t = 0; t <= stepLimit; t++)
                 {
                     Clause *newClause = new Clause;
                     newClause->AddLit(~(AddBoxLiteral(row, col, box1, t)));
@@ -413,7 +412,7 @@ void SokobanSolver::BoxAndPlayerCollisionConstraints()
                 int col = walkable_coord.second;
                 if (preprocessor.isDeadLockBoxPos(row, col))
                     continue;
-                for (int t = 1; t <= stepLimit; t++)
+                for (int t = 0; t <= stepLimit; t++)
                 {
                     Clause *newClause = new Clause;
                     newClause->AddLit(~(AddBoxLiteral(row, col, box, t)));
@@ -580,7 +579,7 @@ void SokobanSolver::SolvedState()
 void SokobanSolver::ExistenceConstraints()
 {
     // cout << "Adding existence constraints..." << endl;
-    for (int t = 1; t < stepLimit; t++)
+    for (int t = 1; t <= stepLimit; t++)
     {
         for (int box = 0; box < boxNum; box++)
         {
@@ -656,6 +655,149 @@ void SokobanSolver::tunnelMacro()
         }
     }
 }
+
+// ============= Pull Stage =============
+void SokobanSolver::InitState_PulledFromTargets() // all targets occupied by a box
+{
+    cout << "Adding initial state for pull stage..." << endl;
+    // 1. Force each target to be occupied by *some* box
+    for (const auto &[row, col] : mapInfo["Targets"])
+    {
+        Clause *someBoxOnTarget = new Clause();
+        for (int box = 0; box < boxNum; box++)
+            someBoxOnTarget->AddLit(AddBoxLiteral(row, col, box, 0));
+        AddClause(someBoxOnTarget);
+    }
+
+    // 2. Prevent more than one box from being on the same target
+    for (int box1 = 0; box1 < boxNum - 1; box1++)
+    {
+        for (int box2 = box1 + 1; box2 < boxNum; box2++)
+        {
+            for (const auto &[row, col] : mapInfo["Targets"])
+            {
+                Clause *noTwoBoxesSameTarget = new Clause();
+                noTwoBoxesSameTarget->AddLit(~AddBoxLiteral(row, col, box1, 0));
+                noTwoBoxesSameTarget->AddLit(~AddBoxLiteral(row, col, box2, 0));
+                AddClause(noTwoBoxesSameTarget);
+            }
+        }
+    }
+
+    // find possible player starting positions
+    for (auto [r, c] : mapInfo["Targets"])
+    {
+        for (auto [dr, dc] : vector<pair<int, int>>{{-1, 0}, {1, 0}, {0, -1}, {0, 1}})
+        {
+            if (preprocessor.notWall(r + dr, c + dc) && !preprocessor.isTarget(r + dr, c + dc))
+                goodPlayerStarts.push_back({r + dr, c + dc});
+        }
+    }
+
+    // 3. one of the good player start positions is occupied by player
+    cout << "Adding player initial position constraints..." << endl;
+    Clause *playerClause = new Clause();
+    for (const auto &[row, col] : goodPlayerStarts)
+        playerClause->AddLit(AddPlayerLiteral(row, col, 0, 0));
+    AddClause(playerClause);
+}
+void SokobanSolver::PlayerPullConstraints()
+{
+    cout << "Adding player pull constraints..." << endl;
+    for (auto walkable_coord : mapInfo["Walkable"])
+    {
+        int row = walkable_coord.first;
+        int col = walkable_coord.second;
+        if (preprocessor.isDeadLockBoxPos(row, col))
+            continue;
+        for (int box = 0; box < boxNum; box++)
+        {
+            for (int t = 1; t <= stepLimit; t++) // all time steps except first state t = 0
+            {
+                // initialize the sets to be taken cartesian products, that is, get all the variables appeared in the constraint
+                vector<set<Lit>> sets_pull;
+                for (int player = 0; player < playerNum; player++)
+                {
+                    // pull down
+                    if (row - 1 >= 0 && preprocessor.notWall(row - 1, col) && !preprocessor.isDeadLockBoxPos(row - 1, col) && preprocessor.notWall(row + 1, col))
+                    {
+                        sets_pull.push_back({AddBoxLiteral(row - 1, col, box, t - 1), AddPlayerLiteral(row, col, player, t - 1), AddPlayerLiteral(row + 1, col, player, t)});
+                    }
+                    // pull up
+                    if (row + 1 < mapSize.first && preprocessor.notWall(row + 1, col) && !preprocessor.isDeadLockBoxPos(row + 1, col) && preprocessor.notWall(row - 1, col))
+                    {
+                        sets_pull.push_back({AddBoxLiteral(row + 1, col, box, t - 1), AddPlayerLiteral(row, col, player, t - 1), AddPlayerLiteral(row - 1, col, player, t)});
+                    }
+                    // pull left
+                    if (col + 1 < mapSize.second && preprocessor.notWall(row, col + 1) && !preprocessor.isDeadLockBoxPos(row, col + 1) && preprocessor.notWall(row, col - 1))
+                    {
+                        sets_pull.push_back({AddBoxLiteral(row, col + 1, box, t - 1), AddPlayerLiteral(row, col, player, t - 1), AddPlayerLiteral(row, col - 1, player, t)});
+                    }
+                    // pull right
+                    if (col - 1 >= 0 && preprocessor.notWall(row, col - 1) && !preprocessor.isDeadLockBoxPos(row, col - 1) && preprocessor.notWall(row, col + 1))
+                    {
+                        sets_pull.push_back({AddBoxLiteral(row, col - 1, box, t - 1), AddPlayerLiteral(row, col, player, t - 1), AddPlayerLiteral(row, col + 1, player, t)});
+                    }
+                }
+                if (sets_pull.empty())
+                    continue;
+                // execute cartesian products
+                vector<vector<Lit>> Cartesian_pull = cartesianProduct(sets_pull);
+
+                // iterate through the cartesian product {{a, b}, {c, d, e}, ...}
+                // some sets might be {{}} since no push backs before
+                for (const auto &set : Cartesian_pull)
+                {
+                    Clause *newClause = new Clause;
+                    newClause->AddLit(~(AddBoxLiteral(row, col, box, t)));
+                    newClause->AddLit(AddBoxLiteral(row, col, box, t - 1));
+                    if (!set.empty())
+                    {
+                        for (const auto &lit : set)
+                            newClause->AddLit(lit);
+                    }
+                    AddClause(newClause);
+                }
+            }
+        }
+    }
+}
+
+void SokobanSolver::PullStageTarget()
+{
+    cout << "Adding pull stage target constraints (soft goal)..." << endl;
+    // Goal: Each box is *not* on its original target at time = stepLimit
+    /*for (const auto &[row, col] : mapInfo["Targets"])
+    {
+        for (int box = 0; box < boxNum; box++)
+        {
+            Clause *newClause = new Clause();
+            newClause->AddLit(~AddBoxLiteral(row, col, box, stepLimit));
+            AddClause(newClause);
+        }
+    }*/
+
+    for (const auto &[row, col] : mapInfo["Targets"])
+    {
+        for (int box = 0; box < boxNum; box++)
+        {
+            Clause *newClause = new Clause();
+            newClause->AddLit(~AddBoxLiteral(row, col, box, 0));
+            newClause->AddLit(~AddBoxLiteral(row, col, box, stepLimit));
+            AddClause(newClause);
+        }
+    }
+
+    for (const auto &[row, col] : preprocessor.pullable_set)
+    {
+        cout << "Adding pull stage target constraints for " << row << " " << col << endl;
+        Clause *newClause = new Clause();
+        for (int box = 0; box < boxNum; box++)
+            newClause->AddLit(AddBoxLiteral(row, col, box, stepLimit));
+        AddClause(newClause);
+    }
+}
+
 void SokobanSolver::AllConstraints()
 {
     InitState();
@@ -672,4 +814,18 @@ void SokobanSolver::AllConstraints()
     ExistenceConstraints();
     DebugConstraints();
     tunnelMacro();
+}
+void SokobanSolver::PullOnlyConstraints()
+{
+    InitState_PulledFromTargets();
+    PlayerMovementConstraints();
+    PlayerPullConstraints(); // You need to implement this.
+    PlayerSinglePlacementConstraints();
+    BoxSinglePlacementConstraints();
+    BoxCollisionConstraints();
+    BoxAndPlayerCollisionConstraints();
+    ExistenceConstraints();
+    DebugConstraints();
+    tunnelMacro();
+    PullStageTarget();
 }

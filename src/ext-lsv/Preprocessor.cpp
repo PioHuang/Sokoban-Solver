@@ -3,7 +3,7 @@
 #include <iostream>
 #include <queue>
 #include <algorithm>
-
+#include <map>
 Preprocessor::Preprocessor(const string &filename, bool verbose) : filename(filename), verbose(verbose) {}
 
 void Preprocessor::loadMap()
@@ -284,4 +284,117 @@ bool Preprocessor::helper(vector<vector<int>> &tunnel_map, vector<vector<bool>> 
         return helper(tunnel_map, visited, row + 1, col, index + 1, 1, t);
     }
     tunnel_map[row][col] = index + 1;
+}
+
+void Preprocessor::findPullRegions()
+{
+    // Initialize pullable position map
+    pullablePosMap = vector<vector<bool>>(mapSize.first, vector<bool>(mapSize.second, false));
+    pullableRegions.clear();
+    pullable_set.clear();
+
+    // Find pullable regions from each target
+    for (const auto &target : mapInfo["Targets"])
+    {
+        cout << "Processing target at position (" << target.first << ", " << target.second << ")" << endl;
+
+        // Initialize visited array for this target
+        vector<vector<bool>> visited(mapSize.first, vector<bool>(mapSize.second, false));
+        vector<pair<int, int>> pullable_region;
+
+        // Start BFS from target position
+        queue<pair<int, int>> q;
+        q.push(target);
+        visited[target.first][target.second] = true;
+
+        while (!q.empty())
+        {
+            auto [row, col] = q.front();
+            q.pop();
+
+            cout << "Processing position (" << row << ", " << col << ")" << endl;
+
+            pullable_region.push_back({row, col});
+            pullable_set.insert({row, col});
+            pullablePosMap[row][col] = true;
+
+            // Check all 4 directions
+            // Up - need two spaces above for box and player to pull
+            if (row > 1 &&
+                !visited[row - 1][col] && notWall(row - 1, col) && notWall(row - 2, col) && !isDeadLockBoxPos(row - 1, col))
+            {
+                cout << "  Adding UP position (" << row - 1 << ", " << col << ")" << endl;
+                q.push({row - 1, col});
+            }
+
+            // Down - need two spaces below for box and player to pull
+            if (row < mapSize.first - 2 &&
+                !visited[row + 1][col] && notWall(row + 1, col) && notWall(row + 2, col) && !isDeadLockBoxPos(row + 1, col))
+            {
+                cout << "  Adding DOWN position (" << row + 1 << ", " << col << ")" << endl;
+                q.push({row + 1, col});
+            }
+
+            // Left - need two spaces to the left for box and player to pull
+            if (col > 1 &&
+                !visited[row][col - 1] && notWall(row, col - 1) && notWall(row, col - 2) && !isDeadLockBoxPos(row, col - 1))
+            {
+                cout << "  Adding LEFT position (" << row << ", " << col - 1 << ")" << endl;
+                q.push({row, col - 1});
+            }
+
+            // Right - need two spaces to the right for box and player to pull
+            if (col < mapSize.second - 2 &&
+                !visited[row][col + 1] && notWall(row, col + 1) && notWall(row, col + 2) && !isDeadLockBoxPos(row, col + 1))
+            {
+                cout << "  Adding RIGHT position (" << row << ", " << col + 1 << ")" << endl;
+                q.push({row, col + 1});
+            }
+
+            visited[row + 1][col] = true;
+            visited[row - 1][col] = true;
+            visited[row][col + 1] = true;
+            visited[row][col - 1] = true;
+        }
+
+        if (!pullable_region.empty())
+        {
+            cout << "Adding pullable region with " << pullable_region.size() << " positions" << endl;
+            pullableRegions.push_back(pullable_region);
+        }
+    }
+
+    if (verbose)
+    {
+        cout << "Found " << pullableRegions.size() << " pullable regions" << endl;
+
+        // Print visualization of pullable regions
+        cout << "Pullable regions visualization ('P' marks pullable positions):" << endl;
+        for (int i = 0; i < mapSize.first; i++)
+        {
+            for (int j = 0; j < mapSize.second; j++)
+            {
+                if (isWall(i, j))
+                {
+                    cout << "#";
+                }
+                else if (pullablePosMap[i][j])
+                {
+                    cout << "P";
+                }
+                else
+                {
+                    cout << " ";
+                }
+            }
+            cout << endl;
+        }
+    }
+}
+
+bool Preprocessor::isPullablePosition(int row, int col) const
+{
+    return row >= 0 && row < mapSize.first &&
+           col >= 0 && col < mapSize.second &&
+           pullablePosMap[row][col];
 }
